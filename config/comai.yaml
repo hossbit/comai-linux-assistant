@@ -1,0 +1,7 @@
+ai_dir: ~/ai
+model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
+max_tokens: 420
+timeout: 120
+file_max_bytes: 24000
+dir_context_max: 120
+error_regex: error|errors|failed|failure|exception|fatal|panic|timeout|warn|warning|traceback
