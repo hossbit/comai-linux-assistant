@@ -153,3 +153,53 @@ comai_answer_file_errors() {
 
   return 1
 }
+
+comai_answer_file_description() {
+  local request="$1"
+  local text file size lines mime first_line description
+
+  [[ "${#FILES[@]}" -gt 0 ]] || return 1
+
+  text="$(printf '%s' "$request" | tr '[:upper:]' '[:lower:]')"
+  if ! printf '%s\n' "$text" | grep -Eq 'what is (this|the) file|what file is this|what kind of file|file type|describe (this|the) file|tell me about (this|the) file'; then
+    return 1
+  fi
+
+  for file in "${FILES[@]}"; do
+    [[ -f "$file" && -r "$file" ]] || continue
+
+    size="$(wc -c < "$file" | tr -d '[:space:]')"
+    lines="$(wc -l < "$file" | tr -d '[:space:]')"
+    first_line="$(sed -n '1p' "$file" 2>/dev/null)"
+
+    mime="text/plain"
+    if comai_have file; then
+      mime="$(file -b --mime-type "$file" 2>/dev/null || printf 'unknown')"
+    fi
+
+    description="$mime file"
+    case "$first_line" in
+      "#!"*)
+        description="executable script"
+        ;;
+      "# "*)
+        description="Markdown-style text document"
+        ;;
+      *" License"|*" license")
+        description="$first_line document"
+        ;;
+      "{"*|"["*)
+        description="structured data file"
+        ;;
+    esac
+
+    if [[ -n "$first_line" ]]; then
+      printf '%s is a %s (%s, %s line(s), %s). First line: %s\n' "$file" "$description" "$(comai_human_bytes "$size")" "$lines" "$mime" "$first_line"
+    else
+      printf '%s is a %s (%s, %s line(s)).\n' "$file" "$description" "$(comai_human_bytes "$size")" "$lines"
+    fi
+    return 0
+  done
+
+  return 1
+}

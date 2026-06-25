@@ -47,6 +47,10 @@ comai_main() {
     return 0
   fi
 
+  if comai_answer_file_description "$text"; then
+    return 0
+  fi
+
   if ! comai_local_ai_ready; then
     comai_error "Local AI API is not responding at ${COMAI_API_BASE}."
     comai_error "Start it with: systemctl --user start comai-localai.service"
