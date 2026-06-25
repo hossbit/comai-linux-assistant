@@ -1,7 +1,7 @@
 # ComAI - Local AI Linux Terminal Assistant
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/comai-hero.png" alt="ComAI local AI assistant for Linux" width="900">
+  <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-hero.png" alt="ComAI local AI assistant for Linux" width="900">
 </div>
 
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora-orange)
@@ -12,7 +12,7 @@
 
 <div align="center">
   <a href="https://buymeacoffee.com/mirhh">
-    <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/bmc-button.png" alt="Buy me a coffee" width="300">
+    <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/bmc-button.png" alt="Buy me a coffee" width="300">
   </a>
 </div>
 
