@@ -19,6 +19,14 @@ Local mode is the default. ChatGPT mode only runs when the first word after `com
 
 ## Install
 
+For local mode, install [hossbit/localai](https://github.com/hossbit/localai) first. ComAI expects it at:
+
+```bash
+~/ai
+```
+
+If you only want ChatGPT mode, you can skip localai and use `comai gpt ...` with an OpenAI API key.
+
 ```bash
 chmod +x scripts/install.sh
 ./scripts/install.sh
@@ -95,7 +103,14 @@ Do not commit a real API key to git.
 
 ## Config
 
-Main config keys:
+Config files:
+
+```bash
+config/comai.yaml              # source default
+~/localcomai/config/comai.yaml # installed config
+```
+
+Example:
 
 ```yaml
 ai_dir: ~/ai
@@ -106,6 +121,19 @@ openai_api_key:
 max_tokens: 420
 timeout: 120
 ```
+
+What the main keys mean:
+
+- `ai_dir`: where localai is installed. Default is `~/ai`.
+- `model`: default local model for `comai hi`.
+- `gpt_model`: default OpenAI model for `comai gpt hi`.
+- `openai_api_base`: OpenAI API URL. Keep this as `https://api.openai.com` unless you know you need another compatible server.
+- `openai_api_key`: optional place to store your OpenAI key for ChatGPT mode. `OPENAI_API_KEY` is safer and overrides this.
+- `max_tokens`: maximum answer length.
+- `timeout`: request timeout in seconds.
+- `file_max_bytes`: maximum bytes read from each `-f` file.
+- `dir_context_max`: maximum current-directory entries sent as context.
+- `error_regex`: words used by local log/error checks.
 
 Useful overrides:
 
