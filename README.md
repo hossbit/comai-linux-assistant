@@ -1,5 +1,12 @@
 # ComAI
 
+![Linux](https://img.shields.io/badge/Linux-Ubuntu-orange)
+![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
+![Local AI](https://img.shields.io/badge/AI-local-blue)
+![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI--compatible-412991)
+![Install](https://img.shields.io/badge/install-~%2Flocalcomai-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 `comai` is a local Linux command assistant written in Bash. It talks to an OpenAI-compatible local AI server, can read files you pass to it, and answers some simple filesystem/log questions directly without asking the model.
 
 ## Features
