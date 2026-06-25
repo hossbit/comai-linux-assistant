@@ -1,6 +1,7 @@
 # ComAI
 
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu-orange)
+![Fedora/RHEL](https://img.shields.io/badge/Linux-Fedora%20%2F%20RHEL-51A2DA)
 ![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
 ![Local AI](https://img.shields.io/badge/AI-local-blue)
 ![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI--compatible-412991)
