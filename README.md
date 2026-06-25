@@ -1,4 +1,4 @@
-# ComAI
+# ComAI - Local AI Linux Terminal Assistant
 
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora-orange)
 ![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
@@ -12,16 +12,33 @@
   </a>
 </div>
 
-`comai` is a Bash assistant for Linux commands, files, and logs.
+**ComAI** is an open-source AI-powered Linux terminal assistant written in Bash.
 
-It has two modes:
+Ask Linux questions, explain shell commands, analyze configuration files,
+inspect logs for errors, and interact with local LLMs or OpenAI directly
+from your terminal.
+
+ComAI supports:
+
+- Local AI models through llama.cpp and OpenAI-compatible APIs
+- OpenAI and ChatGPT API models
+- Linux command explanations
+- File and configuration analysis
+- Log analysis and error detection
+- Custom model selection
+- Bash-friendly installation and configuration
+
+## Quick Example
 
 ```bash
-comai hi      # local model
-comai gpt hi  # ChatGPT/OpenAI
+comai explain chmod 755
+comai how do I find files larger than 1GB?
+comai do you see any error? -f application.log
+comai gpt explain this nginx configuration -f nginx.conf
 ```
 
-Local mode is the default. ChatGPT mode only runs when the first word after `comai` is `gpt` or `chatgpt`.
+Local mode is the default. ChatGPT mode only runs when the first word after
+`comai` is `gpt` or `chatgpt`.
 
 ## Install
 
