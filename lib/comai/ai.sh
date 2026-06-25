@@ -80,6 +80,17 @@ comai_clean_ai_output() {
 }
 
 comai_ask_ai() {
+  case "$COMAI_PROVIDER" in
+    openai)
+      comai_ask_openai "$@"
+      ;;
+    *)
+      comai_ask_local_ai "$@"
+      ;;
+  esac
+}
+
+comai_ask_local_ai() {
   local prompt="$1"
   local response content
 
@@ -111,6 +122,65 @@ comai_ask_ai() {
   content="$(printf '%s' "$response" | jq -r '.choices[0].message.content // .error.message // empty' | comai_clean_ai_output)"
   if [[ -z "$content" ]]; then
     comai_error "local AI returned an empty response with model ${COMAI_MODEL}."
+    return 1
+  fi
+
+  printf '%s\n' "$content"
+}
+
+comai_ask_openai() {
+  local prompt="$1"
+  local response content http_status response_body
+
+  if ! comai_have curl || ! comai_have jq; then
+    comai_error "curl and jq are required for OpenAI requests."
+    return 1
+  fi
+
+  if [[ -z "${COMAI_OPENAI_API_KEY:-}" ]]; then
+    comai_error "OpenAI API key is required for ChatGPT requests."
+    comai_error "Set openai_api_key in config/comai.yaml or export OPENAI_API_KEY."
+    return 1
+  fi
+
+  response="$(
+    jq -n \
+      --arg model "$COMAI_MODEL" \
+      --arg prompt "$prompt" \
+      --arg max_tokens "$COMAI_MAX_TOKENS" \
+      '{
+        model: $model,
+        input: [
+          {role: "system", content: "You are ComAI, a Linux command assistant. Use the provided live context and answer the actual request. Keep wording clean and avoid repetition."},
+          {role: "user", content: $prompt}
+        ],
+        max_output_tokens: ($max_tokens | tonumber)
+      }' \
+      | curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/responses" \
+          -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" \
+          -H 'Content-Type: application/json' \
+          --data-binary @-
+  )"
+
+  http_status="$(printf '%s' "$response" | tail -n 1)"
+  response_body="$(printf '%s' "$response" | sed '$d')"
+  if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
+    content="$(printf '%s' "$response_body" | jq -r '.error.message // empty' 2>/dev/null | comai_clean_ai_output)"
+    if [[ -n "$content" ]]; then
+      comai_error "OpenAI API error ${http_status}: ${content}"
+    else
+      comai_error "OpenAI API error ${http_status}."
+    fi
+    return 1
+  fi
+
+  content="$(
+    printf '%s' "$response_body" \
+      | jq -r '.output_text // ([.output[]?.content[]? | select(.type == "output_text") | .text] | join("\n")) // .error.message // empty' \
+      | comai_clean_ai_output
+  )"
+  if [[ -z "$content" ]]; then
+    comai_error "OpenAI returned an empty response with model ${COMAI_MODEL}."
     return 1
   fi
 

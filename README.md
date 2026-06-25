@@ -1,225 +1,160 @@
 # ComAI
 
-![Linux](https://img.shields.io/badge/Linux-Ubuntu-orange)
-![Fedora/RHEL](https://img.shields.io/badge/Linux-Fedora%20%2F%20RHEL-51A2DA)
-![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
-![Local AI](https://img.shields.io/badge/AI-local-blue)
-![OpenAI Compatible](https://img.shields.io/badge/API-OpenAI--compatible-412991)
-![Install](https://img.shields.io/badge/install-~%2Flocalcomai-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
+`comai` is a Bash assistant for Linux commands, files, and logs.
 
-`comai` is a local Linux command assistant written in Bash. It talks to an OpenAI-compatible local AI server, can read files you pass to it, and answers some simple filesystem/log questions directly without asking the model.
-
-## Features
-
-- Ask Linux and command-line questions from the terminal.
-- Include file content with `-f` / `--file`.
-- Automatically uses an existing file mentioned in the current directory.
-- Direct checks for common local facts, such as newest/largest file, number lookup in a file, and log error scans.
-- Per-request model selection with `--model=...`.
-- User install into `~/localcomai`.
-- Small wrapper commands in `~/.local/bin`, not symlinks.
-
-## Requirements
-
-ComAI needs [hossbit/localai](https://github.com/hossbit/localai) installed in `~/ai`. That project provides the local OpenAI-compatible AI server used by `comai`.
-
-Required commands:
-
-```text
-bash curl jq find sort head sed awk grep wc tr readlink systemctl
-```
-
-Optional commands:
-
-```text
-file numfmt
-```
-
-The installer checks for required commands and can install missing packages on systems with `apt`, `dnf`, or `pacman`.
-
-ComAI expects a local OpenAI-compatible AI service under `~/ai`. The included user service starts:
+It has two modes:
 
 ```bash
-~/ai/start.sh
+comai hi      # local model
+comai gpt hi  # ChatGPT/OpenAI
 ```
 
-and stops:
-
-```bash
-~/ai/stop.sh
-```
+Local mode is the default. ChatGPT mode only runs when the first word after `comai` is `gpt` or `chatgpt`.
 
 ## Install
-
-Clone the repo, then run:
 
 ```bash
 chmod +x scripts/install.sh
 ./scripts/install.sh
 ```
 
-The installer copies ComAI into `~/localcomai`, creates wrapper commands, reloads systemd, and enables/starts `comai-localai.service`.
+Installed files go to `~/localcomai`.
 
-Default install location:
-
-```bash
-~/localcomai
-```
-
-Command wrappers:
+Commands:
 
 ```bash
-~/.local/bin/comai
-~/.local/bin/comi
+comai
+comi
 ```
 
-If `comai` is not found after installing:
+## Common Usage
 
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-The installer only prints this PATH hint when `~/.local/bin` is missing from your current `PATH`.
-
-To install somewhere else:
-
-```bash
-COMAI_INSTALL_DIR="$HOME/tools/localcomai" ./scripts/install.sh
-```
-
-## Uninstall
-
-From the source repo:
-
-```bash
-./scripts/uninstall.sh
-```
-
-Or from the installed copy:
-
-```bash
-~/localcomai/scripts/uninstall.sh
-```
-
-Uninstall removes ComAI user files and leaves `~/ai` untouched.
-
-## Usage
-
-Ask a normal question:
+Ask a Linux question:
 
 ```bash
 comai what is /etc in linux?
+comai how this command work -command "find . -type f -size +100M"
 ```
 
-Use a specific model:
+Use ChatGPT:
 
 ```bash
-comai --model=Qwen2.5-7B-Instruct-Q4_K_M summarize this file -f README.md
+comai gpt hi
+comai gpt explain chmod 755
 ```
 
-Read and summarize a file:
+Read a file:
 
 ```bash
-comai summarize this file -f README.md
+comai explain this file -f script.sh
+comai gpt summarize this file -f llama-swap.log
 ```
 
-Ask about a file by name from the same directory:
-
-```bash
-comai can you see number 200 in this file llama-swap.log
-```
-
-Check a log for common error lines:
-
-```bash
-comai do you see any error? -f llama-swap.log
-comai is this log ok llama-swap.log
-```
-
-Ask current-directory file facts:
+Ask simple local file/log checks:
 
 ```bash
 comai newest file
 comai biggest file here
-comai oldest file
-comai smallest file
+comai do you see any error? -f llama-swap.log
 ```
 
-Ask about a command:
+Choose a model for one request:
 
 ```bash
-comai how this command work -command "find . -type f -size +100M"
+comai --model=Qwen2.5-7B-Instruct-Q4_K_M hi
+comai gpt --model=gpt-5.5 hi
 ```
 
-## Configuration
+## ChatGPT Setup
 
-Defaults live in:
+Use an environment variable:
+
+```bash
+export OPENAI_API_KEY="your_api_key"
+```
+
+Or put the key in the installed config:
+
+```yaml
+openai_api_key: your_api_key
+```
+
+Installed config:
 
 ```bash
 ~/localcomai/config/comai.yaml
 ```
 
-Source default config:
+Do not commit a real API key to git.
 
-```bash
-config/comai.yaml
-```
+## Config
 
-Current config keys:
+Main config keys:
 
 ```yaml
 ai_dir: ~/ai
 model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
+gpt_model: gpt-5.5
+openai_api_base: https://api.openai.com
+openai_api_key:
 max_tokens: 420
 timeout: 120
-file_max_bytes: 24000
-dir_context_max: 120
-error_regex: error|errors|failed|failure|exception|fatal|panic|timeout|warn|warning|traceback
 ```
 
-Environment variables can override config values:
+Useful overrides:
 
 ```bash
 COMAI_MODEL=Qwen2.5-7B-Instruct-Q4_K_M comai hi
-COMAI_MAX_TOKENS=120 comai summarize this file -f README.md
-COMAI_FILE_MAX_BYTES=60000 comai summarize this log -f app.log
+OPENAI_API_KEY=your_api_key comai gpt hi
+COMAI_MAX_TOKENS=120 comai hi
 ```
 
-## Project Layout
+## Local AI
 
-```text
-bin/comai                     main entrypoint
-config/comai.yaml             default config
-lib/comai/config.sh           config and shared helpers
-lib/comai/args.sh             command-line parsing
-lib/comai/context.sh          file and directory context
-lib/comai/local-checks.sh     direct filesystem/log checks
-lib/comai/model-conditions.sh model-specific behavior hooks
-lib/comai/ai.sh               local AI API request and output cleanup
-scripts/install.sh            user installer
-scripts/uninstall.sh          user uninstaller
-scripts/comai-localai-service.sh
-```
+ComAI expects a local OpenAI-compatible server in `~/ai`.
 
-## Troubleshooting
-
-If the local API is not responding:
+Start it:
 
 ```bash
 systemctl --user start comai-localai.service
 ```
 
-Check available models:
+Or manually:
+
+```bash
+~/ai/start.sh
+```
+
+Check local models:
 
 ```bash
 curl -s http://127.0.0.1:11435/v1/models | jq -r '.data[].id'
 ```
 
-If model output is poor, try another model for that request:
+## Troubleshooting
 
-```bash
-comai --model=Qwen2.5-7B-Instruct-Q4_K_M summarize this file -f README.md
+`comai gpt ...` says `429`: OpenAI rejected the request for rate limit or quota. Check billing, credits, project, or rate limits.
+
+`comai gpt ...` works without exporting a key: it is probably reading `openai_api_key` from `~/localcomai/config/comai.yaml`.
+
+`comai ...` cannot reach local AI: start `comai-localai.service` or run `~/ai/start.sh`.
+
+## Requirements
+
+```text
+bash curl jq find sort head sed awk grep wc tr readlink systemctl
 ```
 
-For direct factual checks, ComAI avoids the model when it can. For example, log error checks and simple file facts are computed with local Linux tools.
+Optional:
+
+```text
+file numfmt
+```
+
+## Uninstall
+
+```bash
+~/localcomai/scripts/uninstall.sh
+```
+
+This removes ComAI files and leaves `~/ai` alone.

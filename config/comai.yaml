@@ -1,5 +1,8 @@
 ai_dir: ~/ai
 model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
+gpt_model: gpt-5.5
+openai_api_base: https://api.openai.com
+openai_api_key:
 max_tokens: 420
 timeout: 120
 file_max_bytes: 24000

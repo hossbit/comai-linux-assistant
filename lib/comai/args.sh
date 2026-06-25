@@ -18,6 +18,7 @@ comai_parse_args() {
 
     if [[ "$next_is_model" -eq 1 ]]; then
       COMAI_MODEL="$arg"
+      COMAI_MODEL_EXPLICIT=1
       next_is_model=0
       shift
       continue
@@ -45,8 +46,19 @@ comai_parse_args() {
     fi
 
     case "$arg" in
+      gpt|chatgpt)
+        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
+          comai_select_openai_provider
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
+        ;;
+      --gpt|--chatgpt)
+        comai_select_openai_provider
+        ;;
       --model=*)
         COMAI_MODEL="${arg#--model=}"
+        COMAI_MODEL_EXPLICIT=1
         ;;
       --model|-m)
         next_is_model=1
