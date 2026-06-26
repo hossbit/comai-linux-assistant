@@ -10,7 +10,7 @@
 ![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
 ![AI](https://img.shields.io/badge/AI-local%20%2B%20Ollama%20%2B%20ChatGPT-blue)
 ![Ollama](https://img.shields.io/badge/Ollama-supported-black)
-![Release](https://img.shields.io/badge/release-v2.1-green)
+![Release](https://img.shields.io/badge/release-v2.1.1-green)
 ![License](https://img.shields.io/badge/license-MIT-green)
 </div>
 
@@ -69,6 +69,10 @@ chmod +x scripts/install.sh
 ```
 
 Installed files go to `~/localcomai`.
+
+The installer explains each section before it changes files. It asks where to
+install ComAI, uses `~/localcomai` by default, shows when files already exist,
+and preserves existing config values while adding new default config keys.
 
 Commands:
 
