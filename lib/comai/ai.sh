@@ -84,6 +84,9 @@ comai_ask_ai() {
     openai)
       comai_ask_openai "$@"
       ;;
+    ollama)
+      comai_ask_ollama "$@"
+      ;;
     *)
       comai_ask_local_ai "$@"
       ;;
@@ -92,7 +95,7 @@ comai_ask_ai() {
 
 comai_ask_local_ai() {
   local prompt="$1"
-  local response content
+  local response content http_status response_body
 
   if ! comai_have curl || ! comai_have jq; then
     comai_error "curl and jq are required for local AI requests."
@@ -114,14 +117,74 @@ comai_ask_local_ai() {
         max_tokens: ($max_tokens | tonumber),
         stream: false
       }' \
-      | curl --max-time "$COMAI_TIMEOUT" -fsS "${COMAI_API_BASE}/v1/chat/completions" \
+      | curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/chat/completions" \
           -H 'Content-Type: application/json' \
           --data-binary @-
   )"
 
-  content="$(printf '%s' "$response" | jq -r '.choices[0].message.content // .error.message // empty' | comai_clean_ai_output)"
+  http_status="$(printf '%s' "$response" | tail -n 1)"
+  response_body="$(printf '%s' "$response" | sed '$d')"
+  if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
+    content="$(
+      printf '%s' "$response_body" \
+        | jq -r '(.error | if type == "object" then .message else . end) // empty' 2>/dev/null \
+        | comai_clean_ai_output
+    )"
+    if [[ -n "$content" ]]; then
+      comai_error "local AI API error ${http_status}: ${content}"
+    else
+      comai_error "local AI API error ${http_status}."
+    fi
+    return 1
+  fi
+
+  content="$(
+    printf '%s' "$response_body" \
+      | jq -r '.choices[0].message.content // (.error | if type == "object" then .message else . end) // empty' \
+      | comai_clean_ai_output
+  )"
   if [[ -z "$content" ]]; then
     comai_error "local AI returned an empty response with model ${COMAI_MODEL}."
+    return 1
+  fi
+
+  printf '%s\n' "$content"
+}
+
+comai_ask_ollama() {
+  local prompt="$1"
+  local response content
+
+  if ! comai_have curl || ! comai_have jq; then
+    comai_error "curl and jq are required for Ollama requests."
+    return 1
+  fi
+
+  response="$(
+    jq -n \
+      --arg model "$COMAI_MODEL" \
+      --arg prompt "$prompt" \
+      --arg max_tokens "$COMAI_MAX_TOKENS" \
+      '{
+        model: $model,
+        messages: [
+          {role: "system", content: "You are ComAI, a Linux command assistant running through Ollama. Use the provided live context and answer the actual request. Keep wording clean and avoid repetition."},
+          {role: "user", content: $prompt}
+        ],
+        options: {
+          temperature: 0,
+          num_predict: ($max_tokens | tonumber)
+        },
+        stream: false
+      }' \
+      | curl --max-time "$COMAI_TIMEOUT" -fsS "${COMAI_API_BASE}/api/chat" \
+          -H 'Content-Type: application/json' \
+          --data-binary @-
+  )"
+
+  content="$(printf '%s' "$response" | jq -r '.message.content // .error // empty' | comai_clean_ai_output)"
+  if [[ -z "$content" ]]; then
+    comai_error "Ollama returned an empty response with model ${COMAI_MODEL}."
     return 1
   fi
 

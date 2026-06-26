@@ -45,7 +45,7 @@ comai_trim_trailing_slashes() {
 
 comai_load_config() {
   local config_file="${COMAI_CONFIG:-$COMAI_ROOT_DIR/config/comai.yaml}"
-  local provider ai_dir api_base_url api_base_port model gpt_model openai_api_base openai_api_key
+  local provider ai_dir api_base_url api_base_port model gpt_model ollama_api_base ollama_model openai_api_base openai_api_key
   local max_tokens timeout file_max_bytes dir_context_max error_regex error_intent_regex
 
   provider="$(comai_yaml_value provider "$config_file" || true)"
@@ -54,6 +54,8 @@ comai_load_config() {
   api_base_port="$(comai_yaml_value api_base_port "$config_file" || true)"
   model="$(comai_yaml_value model "$config_file" || true)"
   gpt_model="$(comai_yaml_value gpt_model "$config_file" || true)"
+  ollama_api_base="$(comai_yaml_value ollama_api_base "$config_file" || true)"
+  ollama_model="$(comai_yaml_value ollama_model "$config_file" || true)"
   openai_api_base="$(comai_yaml_value openai_api_base "$config_file" || true)"
   openai_api_key="$(comai_yaml_value openai_api_key "$config_file" || true)"
   max_tokens="$(comai_yaml_value max_tokens "$config_file" || true)"
@@ -64,22 +66,40 @@ comai_load_config() {
   error_intent_regex="$(comai_yaml_value error_intent_regex "$config_file" || true)"
 
   api_base_url="$(comai_trim_trailing_slashes "${api_base_url:-http://127.0.0.1}")"
+  ollama_api_base="$(comai_trim_trailing_slashes "${ollama_api_base:-http://127.0.0.1:11434}")"
 
   COMAI_PROVIDER="${COMAI_PROVIDER:-${provider:-local}}"
   COMAI_AI_DIR="${COMAI_AI_DIR:-$(comai_expand_home "${ai_dir:-~/ai}")}"
   COMAI_OPENAI_MODEL="${COMAI_OPENAI_MODEL:-${gpt_model:-gpt-5.5}}"
+  COMAI_OLLAMA_MODEL="${COMAI_OLLAMA_MODEL:-${ollama_model:-qwen2.5-coder:7b}}"
   if [[ -z "${COMAI_MODEL:-}" ]]; then
     case "$COMAI_PROVIDER" in
       openai)
         COMAI_MODEL="$COMAI_OPENAI_MODEL"
+        ;;
+      ollama)
+        COMAI_MODEL="$COMAI_OLLAMA_MODEL"
         ;;
       *)
         COMAI_MODEL="${model:-Qwen2.5-Coder-7B-Instruct-Q4_K_M}"
         ;;
     esac
   fi
-  COMAI_API_BASE="${COMAI_API_BASE:-${api_base_url}:${api_base_port:-11435}}"
   COMAI_OPENAI_API_BASE="${COMAI_OPENAI_API_BASE:-${openai_api_base:-https://api.openai.com}}"
+  COMAI_OLLAMA_API_BASE="${COMAI_OLLAMA_API_BASE:-${ollama_api_base}}"
+  if [[ -z "${COMAI_API_BASE:-}" ]]; then
+    case "$COMAI_PROVIDER" in
+      openai)
+        COMAI_API_BASE="$COMAI_OPENAI_API_BASE"
+        ;;
+      ollama)
+        COMAI_API_BASE="$COMAI_OLLAMA_API_BASE"
+        ;;
+      *)
+        COMAI_API_BASE="${api_base_url}:${api_base_port:-11435}"
+        ;;
+    esac
+  fi
   COMAI_OPENAI_API_KEY="${OPENAI_API_KEY:-${COMAI_OPENAI_API_KEY:-${openai_api_key}}}"
   COMAI_MAX_TOKENS="${COMAI_MAX_TOKENS:-${max_tokens:-420}}"
   COMAI_TIMEOUT="${COMAI_TIMEOUT:-${timeout:-120}}"
@@ -100,13 +120,16 @@ Usage:
   comai compare these files --file old.conf --file new.conf
   comai how this command work -command "ls -lah"
   comai gpt hi
+  comai ollama hi
   comai --model=MODEL ask anything
 
 Options:
   gpt, chatgpt                 Use OpenAI ChatGPT for this request
   --gpt, --chatgpt             Use OpenAI ChatGPT for this request
+  ollama                       Use Ollama for this request
+  --ollama                     Use Ollama for this request
   --model MODEL, --model=MODEL   Use a different model for this request
-  --api-base URL, --api-base=URL Use a different OpenAI-compatible API
+  --api-base URL, --api-base=URL Use a different provider API base
   --max-tokens N                Limit answer length
   -f, --file PATH               Add a readable file as context
   --local                       Accepted for old commands; the request still goes to AI
@@ -124,6 +147,8 @@ Environment:
   COMAI_OPENAI_MODEL=$COMAI_OPENAI_MODEL
   COMAI_OPENAI_API_BASE=$COMAI_OPENAI_API_BASE
   COMAI_OPENAI_API_KEY=${COMAI_OPENAI_API_KEY:+set}
+  COMAI_OLLAMA_MODEL=$COMAI_OLLAMA_MODEL
+  COMAI_OLLAMA_API_BASE=$COMAI_OLLAMA_API_BASE
   COMAI_MAX_TOKENS=$COMAI_MAX_TOKENS
   COMAI_FILE_MAX_BYTES=$COMAI_FILE_MAX_BYTES
   COMAI_DIR_CONTEXT_MAX=$COMAI_DIR_CONTEXT_MAX
@@ -149,4 +174,12 @@ comai_select_openai_provider() {
     COMAI_MODEL="$COMAI_OPENAI_MODEL"
   fi
   COMAI_API_BASE="$COMAI_OPENAI_API_BASE"
+}
+
+comai_select_ollama_provider() {
+  COMAI_PROVIDER="ollama"
+  if [[ "${COMAI_MODEL_EXPLICIT:-0}" -ne 1 ]]; then
+    COMAI_MODEL="$COMAI_OLLAMA_MODEL"
+  fi
+  COMAI_API_BASE="$COMAI_OLLAMA_API_BASE"
 }

@@ -8,8 +8,9 @@
 
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora-orange)
 ![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
-![AI](https://img.shields.io/badge/AI-local%20%2B%20ChatGPT-blue)
-![Release](https://img.shields.io/badge/release-v2.0-green)
+![AI](https://img.shields.io/badge/AI-local%20%2B%20Ollama%20%2B%20ChatGPT-blue)
+![Ollama](https://img.shields.io/badge/Ollama-supported-black)
+![Release](https://img.shields.io/badge/release-v2.1-green)
 ![License](https://img.shields.io/badge/license-MIT-green)
 </div>
 
@@ -22,12 +23,13 @@
 **ComAI** is an open-source AI-powered Linux terminal assistant written in Bash.
 
 Ask Linux questions, explain shell commands, analyze configuration files,
-inspect logs for errors, and interact with local LLMs or OpenAI directly
+inspect logs for errors, and interact with local LLMs, Ollama, or OpenAI directly
 from your terminal.
 
 ComAI supports:
 
 - Local AI models through llama.cpp and OpenAI-compatible APIs
+- Ollama models for local chat and file analysis
 - OpenAI and ChatGPT API models
 - Linux command explanations
 - File and configuration analysis
@@ -41,11 +43,12 @@ ComAI supports:
 comai explain chmod 755
 comai how do I find files larger than 1GB?
 comai do you see any error? -f application.log
+comai ollama explain this script -f script.sh
 comai gpt explain this nginx configuration -f nginx.conf
 ```
 
-Local mode is the default. ChatGPT mode only runs when the first word after
-`comai` is `gpt` or `chatgpt`.
+Local mode is the default. Ollama mode runs when the first word after `comai`
+is `ollama`. ChatGPT mode runs when the first word is `gpt` or `chatgpt`.
 
 ## Install
 
@@ -55,7 +58,8 @@ For local mode, install [hossbit/localai](https://github.com/hossbit/localai) fi
 ~/ai
 ```
 
-If you only want ChatGPT mode, you can skip localai and use `comai gpt ...` with an OpenAI API key.
+If you only want Ollama or ChatGPT mode, you can skip localai and use
+`comai ollama ...` or `comai gpt ...`.
 
 ```bash
 git clone https://github.com/hossbit/comai-linux-assistant.git
@@ -89,10 +93,18 @@ comai gpt hi
 comai gpt explain chmod 755
 ```
 
+Use Ollama:
+
+```bash
+comai ollama hi
+comai ollama explain chmod 755
+```
+
 Read a file:
 
 ```bash
 comai explain this file -f script.sh
+comai ollama summarize this file -f README.md
 comai gpt summarize this file -f llama-swap.log
 ```
 
@@ -108,6 +120,7 @@ Choose a model for one request:
 
 ```bash
 comai --model=Qwen2.5-7B-Instruct-Q4_K_M hi
+comai ollama --model=qwen2.5-coder:7b hi
 comai gpt --model=gpt-5.5 hi
 ```
 
@@ -151,6 +164,8 @@ api_base_url: http://127.0.0.1
 api_base_port: 11435
 model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
 gpt_model: gpt-5.5
+ollama_api_base: http://127.0.0.1:11434
+ollama_model: qwen2.5-coder:7b
 openai_api_base: https://api.openai.com
 openai_api_key:
 max_tokens: 420
@@ -163,12 +178,14 @@ error_intent_regex: error|errors|failed|failure|warning|warnings|problem|problem
 
 What the main keys mean:
 
-- `provider`: default provider. Use `local` or `openai`.
+- `provider`: default provider. Use `local`, `ollama`, or `openai`.
 - `ai_dir`: where localai is installed. Default is `~/ai`.
 - `api_base_url`: local OpenAI-compatible API URL without the port.
 - `api_base_port`: local OpenAI-compatible API port.
 - `model`: default local model for `comai hi`.
 - `gpt_model`: default OpenAI model for `comai gpt hi`.
+- `ollama_api_base`: Ollama API URL. Default is `http://127.0.0.1:11434`.
+- `ollama_model`: default Ollama model for `comai ollama hi`.
 - `openai_api_base`: OpenAI API URL. Keep this as `https://api.openai.com` unless you know you need another compatible server.
 - `openai_api_key`: optional place to store your OpenAI key for ChatGPT mode. `OPENAI_API_KEY` is safer and overrides this.
 - `max_tokens`: maximum answer length.
@@ -182,6 +199,7 @@ Useful overrides:
 
 ```bash
 COMAI_MODEL=Qwen2.5-7B-Instruct-Q4_K_M comai hi
+COMAI_PROVIDER=ollama comai hi
 OPENAI_API_KEY=your_api_key comai gpt hi
 COMAI_MAX_TOKENS=120 comai hi
 ```
@@ -208,6 +226,21 @@ Check local models:
 curl -s http://127.0.0.1:11435/v1/models | jq -r '.data[].id'
 ```
 
+## Ollama
+
+Start Ollama, then run:
+
+```bash
+comai ollama hi
+comai ollama summarize this file -f README.md
+```
+
+Check Ollama models:
+
+```bash
+curl -s http://127.0.0.1:11434/api/tags | jq -r '.models[].name'
+```
+
 ## Troubleshooting
 
 `comai gpt ...` says `429`: OpenAI rejected the request for rate limit or quota. Check billing, credits, project, or rate limits.
@@ -215,6 +248,8 @@ curl -s http://127.0.0.1:11435/v1/models | jq -r '.data[].id'
 `comai gpt ...` works without exporting a key: it is probably reading `openai_api_key` from `~/localcomai/config/comai.yaml`.
 
 `comai ...` cannot reach local AI: start `comai-localai.service` or run `~/ai/start.sh`.
+
+`comai ollama ...` cannot reach Ollama: start Ollama and check `ollama_api_base` in `config/comai.yaml`.
 
 ## Requirements
 

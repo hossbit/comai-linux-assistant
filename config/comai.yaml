@@ -1,4 +1,4 @@
-# Default provider. Use "local" for localai or "openai" for ChatGPT/OpenAI mode.
+# Default provider. Use "local", "ollama", or "openai".
 provider: local
 
 # Directory where localai is installed.
@@ -15,6 +15,12 @@ model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
 
 # Default OpenAI model used when provider is "openai" or the user runs "comai gpt ...".
 gpt_model: gpt-5.5
+
+# Ollama API base URL without a trailing API path.
+ollama_api_base: http://127.0.0.1:11434
+
+# Default Ollama model used when provider is "ollama" or the user runs "comai ollama ...".
+ollama_model: qwen2.5-coder:7b
 
 # OpenAI API base URL without a trailing /v1 path.
 openai_api_base: https://api.openai.com

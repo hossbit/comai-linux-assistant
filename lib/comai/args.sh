@@ -56,6 +56,16 @@ comai_parse_args() {
       --gpt|--chatgpt)
         comai_select_openai_provider
         ;;
+      ollama)
+        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
+          comai_select_ollama_provider
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
+        ;;
+      --ollama)
+        comai_select_ollama_provider
+        ;;
       --model=*)
         COMAI_MODEL="${arg#--model=}"
         COMAI_MODEL_EXPLICIT=1
