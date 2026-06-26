@@ -4,11 +4,14 @@
   <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-hero.png" alt="ComAI local AI assistant for Linux" width="900">
 </div>
 
+<div align="center">
+
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora-orange)
 ![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
 ![AI](https://img.shields.io/badge/AI-local%20%2B%20ChatGPT-blue)
 ![Release](https://img.shields.io/badge/release-v2.0-green)
 ![License](https://img.shields.io/badge/license-MIT-green)
+</div>
 
 <div align="center">
   <a href="https://buymeacoffee.com/mirhh">
