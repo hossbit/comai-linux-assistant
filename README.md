@@ -12,6 +12,7 @@
 ![Ollama](https://img.shields.io/badge/Ollama-supported-black)
 ![Release](https://img.shields.io/badge/release-v2.1.2-green)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![Wiki](https://img.shields.io/badge/Wiki-documentation-blueviolet)](https://github.com/hossbit/comai-linux-assistant-wiki)
 </div>
 
 <div align="center">
@@ -36,6 +37,15 @@ ComAI supports:
 - Log analysis and error detection
 - Custom model selection
 - Bash-friendly installation and configuration
+
+## Documentation
+
+Read the full wiki here:
+
+https://github.com/hossbit/comai-linux-assistant-wiki
+
+The wiki includes installation, quick start, provider setup, configuration,
+file and log analysis, troubleshooting, and uninstall guides.
 
 ## Quick Example
 
