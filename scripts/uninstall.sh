@@ -8,6 +8,7 @@ BIN_DIR="${HOME}/.local/bin"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 SERVICE_NAME="comai-localai.service"
 SERVICE_FILE="$SYSTEMD_USER_DIR/$SERVICE_NAME"
+LOCALAI_DIR_NOTE="$HOME/ai"
 REMOVED_ITEMS=()
 SKIPPED_ITEMS=()
 
@@ -37,6 +38,65 @@ expand_path() {
   else
     printf '%s\n' "$value"
   fi
+}
+
+usage() {
+  cat <<EOF
+Usage: $0 [--dir PATH]
+
+Uninstalls ComAI user files created by scripts/install.sh.
+
+Options:
+  --dir PATH   Uninstall ComAI from PATH. Same as COMAI_INSTALL_DIR=PATH.
+  -h, --help   Show this help
+EOF
+}
+
+parse_args() {
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --dir)
+        [[ "$#" -ge 2 ]] || {
+          usage >&2
+          exit 2
+        }
+        INSTALL_DIR="$2"
+        shift 2
+        ;;
+      --dir=*)
+        INSTALL_DIR="${1#--dir=}"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        exit 2
+        ;;
+    esac
+  done
+}
+
+yaml_value() {
+  local key="$1"
+  local file="$2"
+
+  [[ -f "$file" ]] || return 1
+  awk -v key="$key" '
+    {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+    }
+    line ~ "^" key "[[:space:]]*:" {
+      value = substr(line, index(line, ":") + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      print value
+      exit
+    }
+  ' "$file"
 }
 
 managed_wrapper_target() {
@@ -153,7 +213,13 @@ remove_install_dir() {
   removed "$INSTALL_DIR"
 }
 
+parse_args "$@"
 INSTALL_DIR="$(resolve_install_dir)"
+if LOCALAI_DIR_NOTE="$(yaml_value ai_dir "$INSTALL_DIR/config/comai.yaml")"; then
+  LOCALAI_DIR_NOTE="$(expand_path "$LOCALAI_DIR_NOTE")"
+else
+  LOCALAI_DIR_NOTE="$HOME/ai"
+fi
 
 section "ComAI uninstall"
 printf 'Resolved install directory: %s\n' "$INSTALL_DIR"
@@ -200,4 +266,6 @@ printf '\nLeft untouched:\n'
 if [[ "$ROOT_DIR" != "$INSTALL_DIR" ]]; then
   printf '  %s\n' "$ROOT_DIR"
 fi
-printf '  %s\n' "$HOME/ai"
+printf '  LocalAI install: %s\n' "$LOCALAI_DIR_NOTE"
+printf '\nComAI does not remove LocalAI. To remove LocalAI too, run:\n'
+printf '  %s/uninstall-local-ai.sh\n' "$LOCALAI_DIR_NOTE"

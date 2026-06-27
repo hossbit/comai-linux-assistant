@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_INSTALL_DIR="$HOME/localcomai"
 INSTALL_DIR="${COMAI_INSTALL_DIR:-}"
+AI_DIR="${COMAI_AI_DIR:-}"
 BIN_DIR="${HOME}/.local/bin"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 SERVICE_NAME="comai-localai.service"
@@ -28,12 +29,84 @@ expand_path() {
   fi
 }
 
+usage() {
+  cat <<EOF
+Usage: $0 [--dir PATH] [--ai-dir PATH]
+
+Installs ComAI into the selected app directory.
+
+Options:
+  --dir PATH      Install ComAI app files into PATH. Same as COMAI_INSTALL_DIR=PATH.
+  --ai-dir PATH   Configure local provider mode to use PATH. Same as COMAI_AI_DIR=PATH.
+  -h, --help      Show this help
+EOF
+}
+
+fail() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 1
+}
+
+parse_args() {
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --dir)
+        [[ "$#" -ge 2 ]] || fail "missing path after --dir"
+        INSTALL_DIR="$2"
+        shift 2
+        ;;
+      --dir=*)
+        INSTALL_DIR="${1#--dir=}"
+        shift
+        ;;
+      --ai-dir)
+        [[ "$#" -ge 2 ]] || fail "missing path after --ai-dir"
+        AI_DIR="$2"
+        shift 2
+        ;;
+      --ai-dir=*)
+        AI_DIR="${1#--ai-dir=}"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        exit 2
+        ;;
+    esac
+  done
+}
+
+validate_absolute_path() {
+  local label="$1"
+  local value="$2"
+
+  case "$value" in
+    /*) ;;
+    *) fail "$label must be an absolute path or start with ~" ;;
+  esac
+}
+
+validate_systemd_path() {
+  local label="$1"
+  local value="$2"
+
+  case "$value" in
+    *[[:space:]%]*) fail "$label cannot contain spaces or percent signs because it is used in a systemd service" ;;
+  esac
+}
+
 prompt_install_dir() {
   local answer default_display
 
   if [[ -n "$INSTALL_DIR" ]]; then
     INSTALL_DIR="$(expand_path "$INSTALL_DIR")"
-    printf 'Using COMAI_INSTALL_DIR: %s\n' "$INSTALL_DIR"
+    validate_absolute_path "install directory" "$INSTALL_DIR"
+    validate_systemd_path "install directory" "$INSTALL_DIR"
+    printf 'Using ComAI install directory: %s\n' "$INSTALL_DIR"
     return
   fi
 
@@ -49,6 +122,32 @@ prompt_install_dir() {
   fi
 
   INSTALL_DIR="$(expand_path "${answer:-$DEFAULT_INSTALL_DIR}")"
+  validate_absolute_path "install directory" "$INSTALL_DIR"
+  validate_systemd_path "install directory" "$INSTALL_DIR"
+}
+
+prompt_ai_dir() {
+  local answer default_display
+
+  if [[ -n "$AI_DIR" ]]; then
+    AI_DIR="$(expand_path "$AI_DIR")"
+    validate_absolute_path "LocalAI directory" "$AI_DIR"
+    printf 'Using LocalAI directory: %s\n' "$AI_DIR"
+    return
+  fi
+
+  default_display="~/ai"
+  if [[ -t 0 ]]; then
+    printf 'Local provider mode starts/stops your LocalAI install directory.\n'
+    printf 'LocalAI directory [%s]: ' "$default_display"
+    read -r answer
+  else
+    answer=""
+    printf 'No interactive terminal detected. Using default LocalAI directory: %s\n' "$default_display"
+  fi
+
+  AI_DIR="$(expand_path "${answer:-$HOME/ai}")"
+  validate_absolute_path "LocalAI directory" "$AI_DIR"
 }
 
 confirm_default_yes() {
@@ -261,6 +360,27 @@ install_config() {
   fi
 }
 
+set_config_value() {
+  local key="$1"
+  local value="$2"
+  local target_config="$INSTALL_DIR/config/comai.yaml"
+  local escaped_value
+
+  escaped_value="${value//\\/\\\\}"
+  escaped_value="${escaped_value//&/\\&}"
+  escaped_value="${escaped_value//|/\\|}"
+  if grep -Eq "^[[:space:]]*${key}[[:space:]]*:" "$target_config"; then
+    sed -i "s|^[[:space:]]*${key}[[:space:]]*:.*|${key}: ${escaped_value}|" "$target_config"
+  else
+    printf '%s: %s\n' "$key" "$value" >> "$target_config"
+  fi
+}
+
+configure_local_ai_dir() {
+  set_config_value ai_dir "$AI_DIR"
+  printf 'Configured local AI directory: %s\n' "$AI_DIR"
+}
+
 install_service() {
   if [[ -f "$SERVICE_FILE" ]]; then
     printf 'Existing user service found: %s\n' "$SERVICE_FILE"
@@ -292,6 +412,8 @@ EOF
   fi
 }
 
+parse_args "$@"
+
 section "ComAI installer"
 cat <<EOF
 This installer will explain each section before it changes anything.
@@ -313,6 +435,10 @@ if [[ -d "$INSTALL_DIR" ]]; then
 else
   printf 'New ComAI directory will be created.\n'
 fi
+
+section "LocalAI location"
+prompt_ai_dir
+printf 'Selected LocalAI directory: %s\n' "$AI_DIR"
 
 section "Dependencies"
 printf 'Checking required commands: %s\n' "${REQUIRED_COMMANDS[*]}"
@@ -343,6 +469,7 @@ cp "$ROOT_DIR/scripts/comai-localai-service.sh" "$INSTALL_DIR/scripts/"
 cp "$ROOT_DIR/scripts/uninstall.sh" "$INSTALL_DIR/scripts/"
 
 install_config
+configure_local_ai_dir
 
 chmod +x "$INSTALL_DIR/bin/comai" "$INSTALL_DIR/scripts/comai-localai-service.sh" "$INSTALL_DIR/scripts/uninstall.sh"
 
@@ -369,6 +496,7 @@ Installed:
   $SERVICE_FILE
   $INSTALL_DIR/config/comai.yaml
   $INSTALL_DIR/lib/comai/
+  LocalAI directory: $AI_DIR
 
 Service:
   $SERVICE_NOTE

@@ -85,6 +85,12 @@ chmod +x scripts/install.sh
 
 Installed files go to `~/localcomai`.
 
+Choose custom install paths without editing config afterward:
+
+```bash
+./scripts/install.sh --dir ~/aiass --ai-dir ~/myai
+```
+
 The installer explains each section before it changes files. It asks where to
 install ComAI, uses `~/localcomai` by default, shows when files already exist,
 and preserves existing config values while adding new default config keys.
