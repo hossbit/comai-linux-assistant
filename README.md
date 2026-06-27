@@ -6,13 +6,24 @@
 
 <div align="center">
 
-![Linux](https://img.shields.io/badge/Linux-Ubuntu%20%7C%20Fedora-orange)
+![Linux](https://img.shields.io/badge/Linux-supported-FCC624)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-supported-E95420)
+![Fedora](https://img.shields.io/badge/Fedora-supported-51A2DA)
 ![Bash](https://img.shields.io/badge/Bash-shell-4EAA25)
 ![AI](https://img.shields.io/badge/AI-local%20%2B%20Ollama%20%2B%20ChatGPT-blue)
 ![Ollama](https://img.shields.io/badge/Ollama-supported-black)
 ![Release](https://img.shields.io/badge/release-v2.1.2-green)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Wiki](https://img.shields.io/badge/Wiki-documentation-blueviolet)](https://github.com/hossbit/comai-linux-assistant-wiki)
+
+![Local First](https://img.shields.io/badge/value-local%20first-2E7D32)
+![Privacy Friendly](https://img.shields.io/badge/value-privacy%20friendly-00695C)
+![Command Help](https://img.shields.io/badge/value-command%20help-6A1B9A)
+![File Analysis](https://img.shields.io/badge/value-file%20analysis-1565C0)
+![Log Checks](https://img.shields.io/badge/value-log%20checks-C62828)
+![Multi Provider](https://img.shields.io/badge/value-multi%20provider-E65100)
+![Bash Native](https://img.shields.io/badge/value-bash%20native-4EAA25)
+![Configurable](https://img.shields.io/badge/value-configurable-455A64)
 </div>
 
 <div align="center">
