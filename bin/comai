@@ -17,15 +17,39 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-comai_main() {
-  local text dir_context files prompt
+COMAI_VERSION="2.2.0"
+COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 
-  comai_load_config
+comai_log() {
+  local level="$1"
+  local event="$2"
+  shift 2
 
-  if [[ "$#" -eq 0 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    comai_usage
-    return 0
+  [[ -n "${COMAI_LOG_FILE:-}" ]] || return 0
+  mkdir -p "$(dirname "$COMAI_LOG_FILE")"
+  printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$event" "$*" >> "$COMAI_LOG_FILE"
+}
+
+comai_history_add() {
+  local request="$1"
+  local response="$2"
+
+  mkdir -p "$(dirname "$COMAI_HISTORY_FILE")"
+  {
+    printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$COMAI_PROVIDER/$COMAI_MODEL" "$request"
+    printf '%s\n\n' "$response"
+  } >> "$COMAI_HISTORY_FILE"
+}
+
+comai_read_stdin_if_piped() {
+  if [[ ! -t 0 ]]; then
+    cat
   fi
+}
+
+comai_run_request() {
+  local text dir_context files prompt
+  local response
 
   comai_parse_args "$@" || return 1
   comai_detect_mentioned_files
@@ -34,29 +58,35 @@ comai_main() {
   if [[ -z "$text" ]]; then
     text="Answer using the provided file and directory context."
   fi
+  comai_log info request_start "provider=$COMAI_PROVIDER model=$COMAI_MODEL chars=${#text} files=${#FILES[@]}"
 
   if [[ "$COMAI_PROVIDER" == "local" ]]; then
     if comai_answer_local_file_fact "$text"; then
+      comai_log info local_answer "kind=file_fact chars=${#text}"
       return 0
     fi
 
     if comai_answer_file_contains "$text"; then
+      comai_log info local_answer "kind=file_contains chars=${#text}"
       return 0
     fi
 
     if comai_answer_file_errors "$text"; then
+      comai_log info local_answer "kind=file_errors chars=${#text}"
       return 0
     fi
 
     if comai_answer_file_description "$text"; then
+      comai_log info local_answer "kind=file_description chars=${#text}"
       return 0
     fi
   fi
 
   if [[ "$COMAI_PROVIDER" == "local" ]] && ! comai_local_ai_ready; then
-    comai_error "Local AI API is not responding at ${COMAI_API_BASE}."
-    comai_error "Start it with: systemctl --user start comai-localai.service"
-    comai_error "Or run: ${COMAI_AI_DIR}/start.sh"
+    comai_log error request_failed "provider=$COMAI_PROVIDER model=$COMAI_MODEL reason=local_api_unreachable api_base=$COMAI_API_BASE"
+    comai_error "Local provider API is not responding at ${COMAI_API_BASE}."
+    comai_error "Start your OpenAI-compatible local server, or edit: ${COMAI_CONFIG_FILE}"
+    comai_error "For the bundled LocalAI helper, run: systemctl --user start comai-localai.service"
     return 1
   fi
 
@@ -68,7 +98,459 @@ comai_main() {
   files="$(comai_file_context)"
   prompt="$(comai_ai_prompt "$text" "$dir_context" "$files")"
   comai_model_note
-  comai_ask_ai "$prompt"
+  if ! response="$(comai_ask_ai "$prompt")"; then
+    comai_log error request_failed "provider=$COMAI_PROVIDER model=$COMAI_MODEL"
+    return 1
+  fi
+  printf '%s\n' "$response"
+  comai_history_add "$text" "$response"
+  comai_log info request_ok "provider=$COMAI_PROVIDER model=$COMAI_MODEL response_chars=${#response}"
+}
+
+comai_cmd_setup() {
+  local provider api model key answer
+
+  printf 'ComAI setup\n'
+  printf 'Provider [local/ollama/openai] (%s): ' "$COMAI_PROVIDER"
+  read -r provider
+  provider="${provider:-$COMAI_PROVIDER}"
+  case "$provider" in
+    local|ollama|openai) ;;
+    *) comai_error "provider must be local, ollama, or openai"; return 1 ;;
+  esac
+
+  comai_set_config_value provider "$provider"
+
+  case "$provider" in
+    local)
+      printf 'Local API base (%s): ' "$COMAI_LOCAL_API_BASE"
+      read -r api
+      printf 'Local model (%s): ' "$COMAI_LOCAL_MODEL"
+      read -r model
+      comai_set_config_value local_api_base "${api:-$COMAI_LOCAL_API_BASE}"
+      comai_set_config_value local_model "${model:-$COMAI_LOCAL_MODEL}"
+      ;;
+    ollama)
+      printf 'Ollama API base (%s): ' "$COMAI_OLLAMA_API_BASE"
+      read -r api
+      printf 'Ollama model (%s): ' "$COMAI_OLLAMA_MODEL"
+      read -r model
+      comai_set_config_value ollama_api_base "${api:-$COMAI_OLLAMA_API_BASE}"
+      comai_set_config_value ollama_model "${model:-$COMAI_OLLAMA_MODEL}"
+      ;;
+    openai)
+      printf 'OpenAI API base (%s): ' "$COMAI_OPENAI_API_BASE"
+      read -r api
+      printf 'OpenAI model (%s): ' "$COMAI_OPENAI_MODEL"
+      read -r model
+      comai_set_config_value openai_api_base "${api:-$COMAI_OPENAI_API_BASE}"
+      comai_set_config_value gpt_model "${model:-$COMAI_OPENAI_MODEL}"
+      if [[ -z "${COMAI_OPENAI_API_KEY:-}" ]]; then
+        printf 'OpenAI API key (leave blank to use OPENAI_API_KEY later): '
+        read -r key
+        [[ -z "$key" ]] || comai_set_config_value openai_api_key "$key"
+      fi
+      ;;
+  esac
+
+  printf 'Saved setup to %s\n' "$COMAI_CONFIG_FILE"
+  printf 'Run `comai status` to test the providers.\n'
+}
+
+comai_provider_model() {
+  case "$1" in
+    local) printf '%s\n' "$COMAI_LOCAL_MODEL" ;;
+    ollama) printf '%s\n' "$COMAI_OLLAMA_MODEL" ;;
+    openai) printf '%s\n' "$COMAI_OPENAI_MODEL" ;;
+  esac
+}
+
+comai_provider_api_base() {
+  case "$1" in
+    local) printf '%s\n' "$COMAI_LOCAL_API_BASE" ;;
+    ollama) printf '%s\n' "$COMAI_OLLAMA_API_BASE" ;;
+    openai) printf '%s\n' "$COMAI_OPENAI_API_BASE" ;;
+  esac
+}
+
+comai_provider_status() {
+  local provider="$1"
+  local api_base
+
+  api_base="$(comai_provider_api_base "$provider")"
+  case "$provider" in
+    local)
+      curl --max-time 2 -fsS "${api_base}/v1/models" >/dev/null 2>&1
+      ;;
+    ollama)
+      curl --max-time 2 -fsS "${api_base}/api/tags" >/dev/null 2>&1
+      ;;
+    openai)
+      [[ -n "${COMAI_OPENAI_API_KEY:-}" ]] || return 2
+      curl --max-time 5 -fsS "${api_base}/v1/models" -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" >/dev/null 2>&1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+comai_provider_models() {
+  local provider="$1"
+  local api_base
+
+  api_base="$(comai_provider_api_base "$provider")"
+  case "$provider" in
+    local)
+      curl --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/v1/models" | jq -r '.data[]?.id'
+      ;;
+    ollama)
+      curl --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/api/tags" | jq -r '.models[]?.name'
+      ;;
+    openai)
+      [[ -n "${COMAI_OPENAI_API_KEY:-}" ]] || {
+        comai_error "OPENAI_API_KEY or openai_api_key is required for OpenAI."
+        return 1
+      }
+      curl --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/v1/models" -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" | jq -r '.data[]?.id'
+      ;;
+  esac
+}
+
+comai_cmd_status_one() {
+  local provider="$1"
+  local model api_base
+
+  model="$(comai_provider_model "$provider")"
+  api_base="$(comai_provider_api_base "$provider")"
+  printf 'Provider: %s%s\n' "$provider" "$([[ "$provider" == "$COMAI_PROVIDER" ]] && printf ' (active)')"
+  printf 'Model: %s\n' "$model"
+  printf 'API base: %s\n' "$api_base"
+
+  if comai_provider_status "$provider"; then
+    printf 'Connection: ok\n'
+    comai_log info provider_status_check "provider=$provider status=ok"
+  else
+    case "$provider:$?" in
+      openai:2)
+        printf 'Connection: missing API key\n'
+        comai_log warn provider_status_check "provider=$provider status=missing_api_key"
+        ;;
+      *)
+        printf 'Connection: failed\n'
+        comai_log warn provider_status_check "provider=$provider status=failed"
+        ;;
+    esac
+    return 1
+  fi
+}
+
+comai_cmd_status() {
+  local provider failed=0
+
+  if ! comai_have curl || ! comai_have jq; then
+    comai_error "curl and jq are required."
+    return 1
+  fi
+
+  printf 'Config: %s\n' "$COMAI_CONFIG_FILE"
+  if [[ "${1:-all}" == "all" ]]; then
+    comai_log info provider_status_check "provider=all"
+    for provider in local ollama openai; do
+      printf '\n'
+      comai_cmd_status_one "$provider" || failed=1
+    done
+  else
+    case "$1" in
+      local|ollama|openai) comai_cmd_status_one "$1" || failed=1 ;;
+      *) comai_error "usage: comai status [all|local|ollama|openai]"; return 1 ;;
+    esac
+  fi
+  return "$failed"
+}
+
+comai_cmd_models() {
+  local provider
+
+  if ! comai_have curl || ! comai_have jq; then
+    comai_error "curl and jq are required."
+    return 1
+  fi
+
+  if [[ "${1:-all}" == "all" ]]; then
+    for provider in local ollama openai; do
+      printf '%s%s:\n' "$provider" "$([[ "$provider" == "$COMAI_PROVIDER" ]] && printf ' (active)')"
+      if ! comai_provider_models "$provider" | sed 's/^/  /'; then
+        printf '  unavailable\n'
+      fi
+      printf '\n'
+    done
+    return 0
+  fi
+
+  case "$1" in
+    local|ollama|openai)
+      comai_log info models "provider=$1"
+      comai_provider_models "$1"
+      ;;
+    *) comai_error "usage: comai models [all|local|ollama|openai]"; return 1 ;;
+  esac
+}
+
+comai_cmd_provider() {
+  case "${1:-}" in
+    ""|show|all)
+      local provider status suffix
+      printf 'active: %s\n' "$COMAI_PROVIDER"
+      for provider in local ollama openai; do
+        suffix=""
+        [[ "$provider" == "$COMAI_PROVIDER" ]] && suffix=" (active)"
+        if comai_provider_status "$provider"; then
+          status="ok"
+        else
+          case "$provider:$?" in
+            openai:2) status="missing API key" ;;
+            *) status="unavailable" ;;
+          esac
+        fi
+        comai_log info provider_status "provider=$provider status=$status active=$([[ "$provider" == "$COMAI_PROVIDER" ]] && printf yes || printf no)"
+        printf '\n%s%s\n' "$provider" "$suffix"
+        printf '  api_base: %s\n' "$(comai_provider_api_base "$provider")"
+        printf '  model: %s\n' "$(comai_provider_model "$provider")"
+        printf '  status: %s\n' "$status"
+      done
+      ;;
+    list)
+      printf 'local\nollama\nopenai\n'
+      ;;
+    set)
+      case "${2:-}" in
+        local|ollama|openai)
+          comai_set_config_value provider "$2"
+          printf 'Set provider to %s in %s\n' "$2" "$COMAI_CONFIG_FILE"
+          ;;
+        *)
+          comai_error "usage: comai provider set local|ollama|openai"
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      comai_error "usage: comai provider [show|all|list|set PROVIDER]"
+      return 1
+      ;;
+  esac
+}
+
+comai_cmd_config() {
+  case "${1:-show}" in
+    show)
+      awk '
+        /^[[:space:]]*openai_api_key[[:space:]]*:/ {
+          value = substr($0, index($0, ":") + 1)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+          if (value == "") {
+            print "openai_api_key:"
+          } else {
+            print "openai_api_key: [set]"
+          }
+          next
+        }
+        { print }
+      ' "$COMAI_CONFIG_FILE"
+      ;;
+    path)
+      printf '%s\n' "$COMAI_CONFIG_FILE"
+      ;;
+    edit)
+      "${EDITOR:-nano}" "$COMAI_CONFIG_FILE"
+      ;;
+    set)
+      if [[ -z "${2:-}" || -z "${3:-}" ]]; then
+        comai_error "usage: comai config set KEY VALUE"
+        return 1
+      fi
+      comai_set_config_value "$2" "$3"
+      printf 'Set %s in %s\n' "$2" "$COMAI_CONFIG_FILE"
+      ;;
+    *)
+      comai_error "usage: comai config [show|path|edit|set KEY VALUE]"
+      return 1
+      ;;
+  esac
+}
+
+comai_cmd_history() {
+  if [[ -f "$COMAI_HISTORY_FILE" ]]; then
+    if comai_have tail; then
+      tail -n "${1:-80}" "$COMAI_HISTORY_FILE"
+    else
+      sed -n '1,220p' "$COMAI_HISTORY_FILE"
+    fi
+  else
+    printf 'No history yet.\n'
+  fi
+}
+
+comai_cmd_chat() {
+  local line
+
+  printf 'ComAI chat. Type /exit to quit.\n'
+  while true; do
+    printf '> '
+    IFS= read -r line || break
+    case "$line" in
+      /exit|/quit) break ;;
+      "") continue ;;
+    esac
+    comai_run_request "$line" || return 1
+  done
+}
+
+comai_cmd_local_service() {
+  local action="$1"
+  local service_name="${COMAI_LOCALAI_SERVICE_NAME:-comai-localai.service}"
+  local service_file="$HOME/.config/systemd/user/$service_name"
+
+  case "$action" in
+    start|stop|restart) ;;
+    *) comai_error "usage: comai start|stop|restart"; return 1 ;;
+  esac
+
+  comai_log info service "$action requested service=$service_name ai_dir=$COMAI_AI_DIR"
+
+  if comai_have systemctl && [[ -f "$service_file" ]]; then
+    systemctl --user "$action" "$service_name"
+    comai_log info service "$action ok service=$service_name method=systemctl"
+    printf '%s: %s\n' "$service_name" "$action"
+    return 0
+  fi
+
+  case "$action" in
+    start)
+      if [[ ! -x "$COMAI_AI_DIR/start.sh" ]]; then
+        comai_log error service "start failed missing=$COMAI_AI_DIR/start.sh"
+        comai_error "start script not found or not executable: $COMAI_AI_DIR/start.sh"
+        return 1
+      fi
+      "$COMAI_AI_DIR/start.sh"
+      ;;
+    stop)
+      if [[ ! -x "$COMAI_AI_DIR/stop.sh" ]]; then
+        comai_log error service "stop failed missing=$COMAI_AI_DIR/stop.sh"
+        comai_error "stop script not found or not executable: $COMAI_AI_DIR/stop.sh"
+        return 1
+      fi
+      "$COMAI_AI_DIR/stop.sh"
+      ;;
+    restart)
+      if [[ ! -x "$COMAI_AI_DIR/stop.sh" || ! -x "$COMAI_AI_DIR/start.sh" ]]; then
+        comai_log error service "restart failed missing_start_or_stop ai_dir=$COMAI_AI_DIR"
+        comai_error "restart requires executable scripts: $COMAI_AI_DIR/stop.sh and $COMAI_AI_DIR/start.sh"
+        return 1
+      fi
+      "$COMAI_AI_DIR/stop.sh"
+      "$COMAI_AI_DIR/start.sh"
+      ;;
+  esac
+
+  comai_log info service "$action ok method=scripts ai_dir=$COMAI_AI_DIR"
+  printf 'local service: %s\n' "$action"
+}
+
+comai_cmd_version() {
+  printf 'ComAI %s\n' "$COMAI_VERSION"
+}
+
+comai_cmd_update() {
+  if ! comai_have git; then
+    comai_error "git is required to update a source checkout."
+    return 1
+  fi
+
+  if [[ -d "$COMAI_ROOT_DIR/.git" ]]; then
+    git -C "$COMAI_ROOT_DIR" pull --ff-only
+  else
+    comai_error "this install is not a git checkout. Re-run the installer to update."
+    return 1
+  fi
+}
+
+comai_cmd_uninstall() {
+  local script="$COMAI_ROOT_DIR/scripts/uninstall.sh"
+
+  if [[ ! -x "$script" ]]; then
+    comai_error "uninstall script not found or not executable: $script"
+    return 1
+  fi
+  exec "$script"
+}
+
+comai_main() {
+  local command stdin_text
+
+  comai_load_config
+
+  if [[ "$#" -eq 0 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    comai_usage
+    return 0
+  fi
+
+  command="$1"
+  shift
+
+  case "$command" in
+    setup)
+      comai_cmd_setup "$@"
+      ;;
+    ask)
+      comai_run_request "$@"
+      ;;
+    chat)
+      comai_cmd_chat "$@"
+      ;;
+    explain)
+      stdin_text="$(comai_read_stdin_if_piped)"
+      comai_run_request "Explain clearly:" "$@" "$stdin_text"
+      ;;
+    analyze)
+      stdin_text="$(comai_read_stdin_if_piped)"
+      comai_run_request "Analyze this and report important findings:" "$@" "$stdin_text"
+      ;;
+    status)
+      comai_cmd_status "$@"
+      ;;
+    check)
+      comai_cmd_status "$@"
+      ;;
+    provider)
+      comai_cmd_provider "$@"
+      ;;
+    models)
+      comai_cmd_models "$@"
+      ;;
+    config)
+      comai_cmd_config "$@"
+      ;;
+    history)
+      comai_cmd_history "$@"
+      ;;
+    start|stop|restart)
+      comai_cmd_local_service "$command"
+      ;;
+    update)
+      comai_cmd_update "$@"
+      ;;
+    version|--version|-V)
+      comai_cmd_version
+      ;;
+    uninstall)
+      comai_cmd_uninstall "$@"
+      ;;
+    *)
+      comai_run_request "$command" "$@"
+      ;;
+  esac
 }
 
 comai_main "$@"

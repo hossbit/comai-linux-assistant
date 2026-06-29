@@ -15,8 +15,12 @@ case "${1:-start}" in
   stop)
     exec "$COMAI_AI_DIR/stop.sh"
     ;;
+  restart)
+    "$COMAI_AI_DIR/stop.sh"
+    exec "$COMAI_AI_DIR/start.sh"
+    ;;
   *)
-    printf 'Usage: %s [start|stop]\n' "$0" >&2
+    printf 'Usage: %s [start|stop|restart]\n' "$0" >&2
     exit 2
     ;;
 esac

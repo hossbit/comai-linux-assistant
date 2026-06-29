@@ -1,17 +1,12 @@
 # Default provider. Use "local", "ollama", or "openai".
 provider: local
 
-# Directory where localai is installed.
-ai_dir: ~/ai
-
-# Local OpenAI-compatible API base URL without the port.
-api_base_url: http://127.0.0.1
-
-# Local OpenAI-compatible API port.
-api_base_port: 11435
+# OpenAI-compatible local API base URL.
+# Examples: LocalAI, llama.cpp server, LM Studio, or any compatible local server.
+local_api_base: http://127.0.0.1:11435
 
 # Default local model used when provider is "local".
-model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
+local_model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
 
 # Default OpenAI model used when provider is "openai" or the user runs "comai gpt ...".
 gpt_model: gpt-5.5
@@ -33,6 +28,9 @@ max_tokens: 420
 
 # HTTP request timeout in seconds.
 timeout: 120
+
+# Activity log file relative to the ComAI install directory.
+log_file: logs/comai.log
 
 # Maximum bytes read from each file passed with -f/--file.
 file_max_bytes: 24000

@@ -98,7 +98,7 @@ comai_ask_local_ai() {
   local response content http_status response_body
 
   if ! comai_have curl || ! comai_have jq; then
-    comai_error "curl and jq are required for local AI requests."
+    comai_error "curl and jq are required for local provider requests."
     return 1
   fi
 
@@ -131,16 +131,16 @@ comai_ask_local_ai() {
         | comai_clean_ai_output
     )"
     if [[ "$http_status" == "404" && "$content" == *"no router for requested model"* ]]; then
-      comai_error "LocalAI is running, but the configured model was not found:"
+      comai_error "Local provider is running, but the configured model was not found:"
       comai_error "  $COMAI_MODEL"
-      comai_error "Add the matching .gguf file to: ${COMAI_AI_DIR}/models"
-      comai_error "Or edit your ComAI config: ${COMAI_CONFIG_FILE}"
+      comai_error "Check local_model and local_api_base in: ${COMAI_CONFIG_FILE}"
+      comai_error "For LocalAI, also check the matching .gguf file under: ${COMAI_AI_DIR}/models"
       return 1
     fi
     if [[ -n "$content" ]]; then
-      comai_error "local AI API error ${http_status}: ${content}"
+      comai_error "local provider API error ${http_status}: ${content}"
     else
-      comai_error "local AI API error ${http_status}."
+      comai_error "local provider API error ${http_status}."
     fi
     return 1
   fi
@@ -151,7 +151,7 @@ comai_ask_local_ai() {
       | comai_clean_ai_output
   )"
   if [[ -z "$content" ]]; then
-    comai_error "local AI returned an empty response with model ${COMAI_MODEL}."
+    comai_error "local provider returned an empty response with model ${COMAI_MODEL}."
     return 1
   fi
 

@@ -9,7 +9,7 @@ BIN_DIR="${HOME}/.local/bin"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 SERVICE_NAME="comai-localai.service"
 SERVICE_FILE="$SYSTEMD_USER_DIR/$SERVICE_NAME"
-REQUIRED_COMMANDS=(bash curl jq find sort head sed awk grep wc tr readlink systemctl)
+REQUIRED_COMMANDS=(bash curl jq find sort head sed awk grep wc tr readlink date systemctl)
 OPTIONAL_COMMANDS=(file numfmt)
 PATH_NOTE=""
 SERVICE_NOTE=""
@@ -37,7 +37,7 @@ Installs ComAI into the selected app directory.
 
 Options:
   --dir PATH      Install ComAI app files into PATH. Same as COMAI_INSTALL_DIR=PATH.
-  --ai-dir PATH   Configure local provider mode to use PATH. Same as COMAI_AI_DIR=PATH.
+  --ai-dir PATH   Configure the optional LocalAI helper directory. Same as COMAI_AI_DIR=PATH.
   -h, --help      Show this help
 EOF
 }
@@ -138,7 +138,8 @@ prompt_ai_dir() {
 
   default_display="~/ai"
   if [[ -t 0 ]]; then
-    printf 'Local provider mode starts/stops your LocalAI install directory.\n'
+    printf 'Local mode can use any OpenAI-compatible local server.\n'
+    printf 'This optional path is only for the bundled LocalAI start/stop helper service.\n'
     printf 'LocalAI directory [%s]: ' "$default_display"
     read -r answer
   else
@@ -422,7 +423,7 @@ It installs:
   app files      -> one directory under your home folder
   commands       -> $BIN_DIR/comai and $BIN_DIR/comi
   config         -> config/comai.yaml inside the app directory
-  user service   -> $SERVICE_FILE for localai mode
+  user service   -> $SERVICE_FILE for the optional LocalAI helper
 
 Existing ComAI files are updated. Existing config values are preserved.
 EOF
@@ -436,7 +437,7 @@ else
   printf 'New ComAI directory will be created.\n'
 fi
 
-section "LocalAI location"
+section "Optional LocalAI helper"
 prompt_ai_dir
 printf 'Selected LocalAI directory: %s\n' "$AI_DIR"
 
@@ -456,7 +457,7 @@ fi
 section "App files"
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$SYSTEMD_USER_DIR"
 rm -rf "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/scripts"
-mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/scripts"
+mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/scripts" "$INSTALL_DIR/logs"
 
 printf 'Installing executable files into: %s/bin\n' "$INSTALL_DIR"
 cp -R "$ROOT_DIR/bin/." "$INSTALL_DIR/bin/"
@@ -478,9 +479,9 @@ printf 'The command wrappers let you run ComAI from any terminal.\n'
 install_command_wrapper "$INSTALL_DIR/bin/comai" "$BIN_DIR/comai"
 install_command_wrapper "$INSTALL_DIR/bin/comai" "$BIN_DIR/comi"
 
-section "Localai user service"
-printf 'This service starts/stops your localai installation for local provider mode.\n'
-printf 'Ollama and ChatGPT modes do not require this service.\n'
+section "LocalAI user service"
+printf 'This optional service starts/stops the configured LocalAI directory.\n'
+printf 'Other local providers can ignore it and use local_api_base in config/comai.yaml.\n'
 install_service
 
 section "Shell PATH"
@@ -496,6 +497,7 @@ Installed:
   $SERVICE_FILE
   $INSTALL_DIR/config/comai.yaml
   $INSTALL_DIR/lib/comai/
+  $INSTALL_DIR/logs/
   LocalAI directory: $AI_DIR
 
 Service:
