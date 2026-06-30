@@ -33,6 +33,20 @@ shell. ComAI is the client; LocalAI is only one optional backend.
 
 ## Install
 
+One-line install:
+
+```bash
+curl -fsSL https://hossbit.github.io/comai/install.sh | bash
+```
+
+Custom install directory:
+
+```bash
+curl -fsSL https://hossbit.github.io/comai/install.sh | COMAI_INSTALL_DIR="$HOME/apps/comai" bash
+```
+
+Manual install:
+
 ```bash
 git clone https://github.com/hossbit/comai-linux-assistant.git
 cd comai-linux-assistant
