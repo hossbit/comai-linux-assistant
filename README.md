@@ -31,6 +31,12 @@ shell. ComAI is the client; LocalAI is only one optional backend.
 - Keeps setup and provider checks visible with `comai status`.
 - Installs as a user-space tool under `~/localcomai`.
 
+## Demo
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-demo.gif" alt="ComAI terminal demo" width="640">
+</div>
+
 ## Install
 
 One-line install:
