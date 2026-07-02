@@ -17,6 +17,8 @@ SERVICE_NOTE=""
 SERVICE_INSTALLED=0
 COMAI_VERSION=""
 INSTALL_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
+INSTALL_SOURCE_REF="${COMAI_REF:-main}"
+INSTALL_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
 
 section() {
   printf '\n== %s ==\n' "$1"
@@ -444,9 +446,18 @@ EOF
 }
 
 detect_install_metadata() {
+  local git_ref
+
   COMAI_VERSION="$(sed -n 's/^COMAI_VERSION="\([^"]*\)"/\1/p' "$ROOT_DIR/bin/comai" | head -n 1)"
   if command -v git >/dev/null 2>&1 && [[ -d "$ROOT_DIR/.git" ]]; then
     INSTALL_SOURCE_URL="$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || printf '%s' "$INSTALL_SOURCE_URL")"
+    git_ref="$(git -C "$ROOT_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    if [[ -z "$git_ref" ]]; then
+      git_ref="$(git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null || true)"
+    fi
+    if [[ -n "$git_ref" ]]; then
+      INSTALL_SOURCE_REF="$git_ref"
+    fi
   fi
 }
 
@@ -517,6 +528,8 @@ configure_local_ai_dir
 cat > "$INSTALL_DIR/.install-meta" <<EOF
 COMAI_INSTALL_VERSION="${COMAI_VERSION:-unknown}"
 COMAI_INSTALL_SOURCE_URL="$INSTALL_SOURCE_URL"
+COMAI_INSTALL_SOURCE_REF="$INSTALL_SOURCE_REF"
+COMAI_INSTALL_TARBALL_BASE="$INSTALL_TARBALL_BASE"
 COMAI_INSTALL_SOURCE_DIR="$ROOT_DIR"
 COMAI_INSTALL_DATE="$(date '+%Y-%m-%d %H:%M:%S')"
 EOF

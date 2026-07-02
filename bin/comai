@@ -17,9 +17,11 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.3.2"
+COMAI_VERSION="2.3.3"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
+COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
+COMAI_REF="${COMAI_REF:-main}"
 
 comai_log() {
   local level="$1"
@@ -515,41 +517,79 @@ comai_cmd_version() {
 }
 
 comai_cmd_update() {
-  local temp_dir status source_url
-
-  if ! comai_have git; then
-    comai_error "git is required to update ComAI."
-    return 1
-  fi
+  local temp_dir source_dir status source_url source_ref tarball_base archive_file extracted
 
   if [[ -d "$COMAI_ROOT_DIR/.git" ]]; then
     printf 'Updating git checkout: %s\n' "$COMAI_ROOT_DIR"
     git -C "$COMAI_ROOT_DIR" pull --ff-only
   else
     source_url="$COMAI_SOURCE_URL"
+    source_ref="$COMAI_REF"
+    tarball_base="$COMAI_TARBALL_BASE"
     if [[ -f "$COMAI_ROOT_DIR/.install-meta" ]]; then
       # shellcheck source=/dev/null
       . "$COMAI_ROOT_DIR/.install-meta"
       source_url="${COMAI_INSTALL_SOURCE_URL:-$COMAI_SOURCE_URL}"
+      source_ref="${COMAI_INSTALL_SOURCE_REF:-$COMAI_REF}"
+      tarball_base="${COMAI_INSTALL_TARBALL_BASE:-$COMAI_TARBALL_BASE}"
     fi
     temp_dir="$(mktemp -d)"
+    source_dir="$temp_dir/source"
 
     printf 'This install is not a git checkout: %s\n' "$COMAI_ROOT_DIR"
-    printf 'Creating a temporary source checkout from: %s\n' "$source_url"
+    printf 'Creating a temporary source checkout from: %s (%s)\n' "$source_url" "$source_ref"
     printf 'Existing config values will be preserved by the installer.\n'
-    if ! git clone --depth 1 "$source_url" "$temp_dir"; then
-      status=$?
-      rm -rf "$temp_dir"
-      return "$status"
+    if comai_have git; then
+      if ! git clone --depth 1 --branch "$source_ref" "$source_url" "$source_dir"; then
+        status=$?
+        rm -rf "$temp_dir"
+        return "$status"
+      fi
+    else
+      if ! comai_have curl || ! comai_have tar; then
+        comai_error "git, or curl and tar, are required to update ComAI."
+        rm -rf "$temp_dir"
+        return 1
+      fi
+      case "$source_ref" in
+        v*|refs/tags/*)
+          archive_file="$tarball_base/refs/tags/${source_ref#refs/tags/}.tar.gz"
+          ;;
+        refs/heads/*)
+          archive_file="$tarball_base/$source_ref.tar.gz"
+          ;;
+        *)
+          archive_file="$tarball_base/refs/heads/$source_ref.tar.gz"
+          ;;
+      esac
+      if ! curl -fsSL "$archive_file" -o "$temp_dir/comai.tar.gz"; then
+        status=$?
+        rm -rf "$temp_dir"
+        return "$status"
+      fi
+      if ! tar -xzf "$temp_dir/comai.tar.gz" -C "$temp_dir"; then
+        status=$?
+        rm -rf "$temp_dir"
+        return "$status"
+      fi
+      extracted="$(find "$temp_dir" -mindepth 1 -maxdepth 1 -type d -name 'comai-linux-assistant-*' | head -n 1)"
+      if [[ -z "${extracted:-}" ]]; then
+        comai_error "could not find extracted ComAI source directory."
+        rm -rf "$temp_dir"
+        return 1
+      fi
+      rm -rf "$source_dir"
+      mv "$extracted" "$source_dir"
     fi
 
-    if [[ ! -f "$temp_dir/scripts/install.sh" ]]; then
-      comai_error "installer not found in cloned source: $temp_dir/scripts/install.sh"
+    if [[ ! -f "$source_dir/scripts/install.sh" ]]; then
+      comai_error "installer not found in cloned source: $source_dir/scripts/install.sh"
       rm -rf "$temp_dir"
       return 1
     fi
 
-    bash "$temp_dir/scripts/install.sh" --dir "$COMAI_ROOT_DIR" --ai-dir "$COMAI_AI_DIR"
+    COMAI_SOURCE_URL="$source_url" COMAI_REF="$source_ref" COMAI_TARBALL_BASE="$tarball_base" \
+      bash "$source_dir/scripts/install.sh" --dir "$COMAI_ROOT_DIR" --ai-dir "$COMAI_AI_DIR"
     status=$?
     rm -rf "$temp_dir"
     return "$status"

@@ -84,6 +84,7 @@ fi
 
 [[ -x "$source_dir/scripts/install.sh" ]] || fail "Installer not found: $source_dir/scripts/install.sh"
 
-bash "$source_dir/scripts/install.sh" --dir "$COMAI_INSTALL_DIR" --ai-dir "$COMAI_AI_DIR"
+COMAI_SOURCE_URL="$COMAI_REPO_URL" COMAI_REF="$COMAI_REF" COMAI_TARBALL_BASE="$COMAI_TARBALL_BASE" \
+  bash "$source_dir/scripts/install.sh" --dir "$COMAI_INSTALL_DIR" --ai-dir "$COMAI_AI_DIR"
 
 log "Done. Try: comai status"
