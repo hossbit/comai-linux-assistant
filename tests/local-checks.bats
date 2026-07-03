@@ -26,7 +26,7 @@ setup() {
   printf 'ticket 12345\n' >log.txt
   FILES=(log.txt)
 
-  run comai_answer_file_contains "does this file contain number 12345"
+  run comai_answer_file_contains "contains number 12345"
 
   [ "$status" -eq 0 ]
   [[ "$output" == *"Yes."* ]]
