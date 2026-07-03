@@ -105,8 +105,8 @@ comai_config_trusted_for_commands() {
   [[ -n "$owner" && -n "$mode" && -n "$current_uid" ]] || return 1
   [[ "$owner" == "$current_uid" ]] || return 1
 
-  group_write=$(( (10#$mode / 10) % 10 & 2 ))
-  other_write=$(( 10#$mode % 10 & 2 ))
+  group_write=$(((10#$mode / 10) % 10 & 2))
+  other_write=$((10#$mode % 10 & 2))
   [[ "$group_write" -eq 0 && "$other_write" -eq 0 ]]
 }
 
