@@ -8,7 +8,7 @@ setup() {
 
 @test "reads nested provider values from yaml" {
   config="$BATS_TEST_TMPDIR/comai.yaml"
-  cat >"$config" <<'EOF'
+  cat > "$config" << 'EOF'
 provider: openai
 providers:
   openai:
@@ -24,7 +24,7 @@ EOF
 
 @test "load config resolves OpenAI API key from command and tightens permissions" {
   config="$BATS_TEST_TMPDIR/comai.yaml"
-  cat >"$config" <<'EOF'
+  cat > "$config" << 'EOF'
 provider: openai
 providers:
   openai:
@@ -46,7 +46,7 @@ EOF
 
 @test "OPENAI_API_KEY overrides configured key command" {
   config="$BATS_TEST_TMPDIR/comai.yaml"
-  cat >"$config" <<'EOF'
+  cat > "$config" << 'EOF'
 provider: openai
 providers:
   openai:
@@ -62,4 +62,22 @@ EOF
   comai_load_config
 
   [ "$COMAI_OPENAI_API_KEY" = "env-key" ]
+}
+
+@test "config set api_key_cmd writes nested OpenAI provider key" {
+  config="$BATS_TEST_TMPDIR/comai.yaml"
+  cat > "$config" << 'EOF'
+provider: local
+providers:
+  openai:
+    api_base: https://api.openai.com
+    model: test-model
+    api_key:
+EOF
+
+  run env COMAI_CONFIG="$config" "$REPO_ROOT/bin/comai" config set api_key_cmd "pass show openai"
+
+  [ "$status" -eq 0 ]
+  [ "$(comai_yaml_provider_value openai api_key_cmd "$config")" = "pass show openai" ]
+  ! grep -Eq '^api_key_cmd:' "$config"
 }

@@ -144,6 +144,7 @@ comai_legacy_provider_config_key() {
     openai:api_base) printf 'openai_api_base\n' ;;
     openai:model) printf 'gpt_model\n' ;;
     openai:api_key) printf 'openai_api_key\n' ;;
+    openai:api_key_cmd) printf 'openai_api_key_cmd\n' ;;
     *) return 1 ;;
   esac
 }
