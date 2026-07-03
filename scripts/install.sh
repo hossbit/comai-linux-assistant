@@ -370,7 +370,7 @@ merge_missing_config_defaults() {
       continue
     fi
 
-    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*: ]]; then
+    if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*: ]]; then
       key="${BASH_REMATCH[1]}"
       if [[ "$key" == "providers" ]]; then
         block=""
@@ -385,6 +385,70 @@ merge_missing_config_defaults() {
       block=""
     fi
   done < "$source_config"
+
+  if grep -Eq "^[[:space:]]{2}openai[[:space:]]*:" "$target_config" &&
+    ! awk '
+      /^[^[:space:]#][^:]*:/ {
+        in_providers = ($0 ~ /^providers[[:space:]]*:/)
+        in_openai = 0
+      }
+      in_providers && $0 ~ /^[[:space:]]{2}openai[[:space:]]*:/ {
+        in_openai = 1
+        next
+      }
+      in_openai && $0 ~ /^[[:space:]]{2}[A-Za-z0-9_-]+[[:space:]]*:/ {
+        in_openai = 0
+      }
+      in_openai && $0 ~ /^[[:space:]]{4}api_key_cmd[[:space:]]*:/ {
+        found = 1
+      }
+      END {
+        exit(found ? 0 : 1)
+      }
+    ' "$target_config"; then
+    awk '
+      BEGIN { in_providers = 0; in_openai = 0; added = 0 }
+      /^[^[:space:]#][^:]*:/ {
+        if (in_openai && !added) {
+          print "    # Optional command that prints the API key, for example: pass show openai"
+          print "    api_key_cmd:"
+          added = 1
+        }
+        in_providers = ($0 ~ /^providers[[:space:]]*:/)
+        in_openai = 0
+      }
+      in_providers && $0 ~ /^[[:space:]]{2}openai[[:space:]]*:/ {
+        in_openai = 1
+        print
+        next
+      }
+      in_openai && $0 ~ /^[[:space:]]{4}api_key[[:space:]]*:/ {
+        print
+        if (!added) {
+          print "    # Optional command that prints the API key, for example: pass show openai"
+          print "    api_key_cmd:"
+          added = 1
+        }
+        next
+      }
+      in_openai && $0 ~ /^[[:space:]]{2}[A-Za-z0-9_-]+[[:space:]]*:/ {
+        if (!added) {
+          print "    # Optional command that prints the API key, for example: pass show openai"
+          print "    api_key_cmd:"
+          added = 1
+        }
+        in_openai = 0
+      }
+      { print }
+      END {
+        if (in_openai && !added) {
+          print "    # Optional command that prints the API key, for example: pass show openai"
+          print "    api_key_cmd:"
+        }
+      }
+    ' "$target_config" > "${target_config}.tmp" && mv "${target_config}.tmp" "$target_config"
+    added+=("providers.openai.api_key_cmd")
+  fi
 
   if [[ "${#added[@]}" -gt 0 ]]; then
     printf 'Merged new config key(s): %s\n' "${added[*]}"
