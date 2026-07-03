@@ -50,7 +50,7 @@ comai_wants_directory_context() {
   text="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
 
   case "$text" in
-    *here*|*current\ director*|*this\ director*|*this\ folder*|*project*|*repo*|*file*|*files*|*folder*|*directory*|*script*|*log*)
+    *here* | *current\ director* | *this\ director* | *this\ folder* | *project* | *repo* | *file* | *files* | *folder* | *directory* | *script* | *log*)
       return 0
       ;;
     *)
@@ -66,10 +66,10 @@ comai_directory_context() {
   printf 'PWD: %s\n' "$PWD"
   printf 'Entries, newest first. Columns: modified_time bytes kind path\n'
 
-  if find . -maxdepth 1 -mindepth 1 -printf '%T@ %TY-%Tm-%Td %TH:%TM %.0s%s %y %p\n' 2>/dev/null \
-      | sort -nr \
-      | head -n "$limit" \
-      | sed -E 's/^[0-9.]+ //'; then
+  if find . -maxdepth 1 -mindepth 1 -printf '%T@ %TY-%Tm-%Td %TH:%TM %.0s%s %y %p\n' 2> /dev/null |
+    sort -nr |
+    head -n "$limit" |
+    sed -E 's/^[0-9.]+ //'; then
     :
   else
     printf '[Directory listing unavailable]\n'
@@ -101,7 +101,7 @@ comai_file_context() {
 
     mime=""
     if comai_have file; then
-      mime="$(file -b --mime-type "$file" 2>/dev/null || true)"
+      mime="$(file -b --mime-type "$file" 2> /dev/null || true)"
     fi
 
     printf '\n--- %s (%s bytes' "$file" "$size"
@@ -113,7 +113,7 @@ comai_file_context() {
       continue
     fi
 
-    head -c "$shown" "$file" 2>/dev/null || true
+    head -c "$shown" "$file" 2> /dev/null || true
     if [[ "$size" -gt "$COMAI_FILE_MAX_BYTES" ]]; then
       printf '\n[Truncated after %s bytes]\n' "$COMAI_FILE_MAX_BYTES"
     fi

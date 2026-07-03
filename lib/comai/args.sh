@@ -46,14 +46,14 @@ comai_parse_args() {
     fi
 
     case "$arg" in
-      gpt|chatgpt)
+      gpt | chatgpt)
         if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
           comai_select_openai_provider
         else
           REQUEST_ARGS+=("$arg")
         fi
         ;;
-      --gpt|--chatgpt)
+      --gpt | --chatgpt)
         comai_select_openai_provider
         ;;
       ollama)
@@ -63,7 +63,7 @@ comai_parse_args() {
           REQUEST_ARGS+=("$arg")
         fi
         ;;
-      lmstudio|lm-studio)
+      lmstudio | lm-studio)
         if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
           comai_select_lmstudio_provider
         else
@@ -80,7 +80,7 @@ comai_parse_args() {
       --ollama)
         comai_select_ollama_provider
         ;;
-      --lmstudio|--lm-studio)
+      --lmstudio | --lm-studio)
         comai_select_lmstudio_provider
         ;;
       --local)
@@ -90,7 +90,7 @@ comai_parse_args() {
         COMAI_MODEL="${arg#--model=}"
         COMAI_MODEL_EXPLICIT=1
         ;;
-      --model|-m)
+      --model | -m)
         next_is_model=1
         ;;
       --api-base=*)
@@ -105,16 +105,16 @@ comai_parse_args() {
       --max-tokens)
         next_is_max_tokens=1
         ;;
-      --file=*|--files=*|-f=*)
+      --file=* | --files=* | -f=*)
         FILES+=("${arg#*=}")
         ;;
-      --file|--files|-f)
+      --file | --files | -f)
         next_is_file=1
         ;;
       --command=*)
         REQUEST_ARGS+=("${arg#--command=}")
         ;;
-      --command|-command|-c)
+      --command | -command | -c)
         next_is_command=1
         ;;
       --local=*)

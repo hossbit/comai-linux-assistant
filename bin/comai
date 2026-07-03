@@ -118,8 +118,11 @@ comai_cmd_setup() {
   read -r provider
   provider="${provider:-$COMAI_PROVIDER}"
   case "$provider" in
-    local|ollama|lmstudio|openai) ;;
-    *) comai_error "provider must be local, ollama, lmstudio, or openai"; return 1 ;;
+    local | ollama | lmstudio | openai) ;;
+    *)
+      comai_error "provider must be local, ollama, lmstudio, or openai"
+      return 1
+      ;;
   esac
 
   comai_set_config_value provider "$provider"
@@ -196,17 +199,17 @@ comai_provider_status() {
   api_base="$(comai_provider_api_base "$provider")"
   case "$provider" in
     local)
-      curl --max-time 2 -fsS "${api_base}/v1/models" >/dev/null 2>&1
+      curl --max-time 2 -fsS "${api_base}/v1/models" > /dev/null 2>&1
       ;;
     ollama)
-      curl --max-time 2 -fsS "${api_base}/api/tags" >/dev/null 2>&1
+      curl --max-time 2 -fsS "${api_base}/api/tags" > /dev/null 2>&1
       ;;
     lmstudio)
-      curl --max-time 2 -fsS "${api_base}/v1/models" >/dev/null 2>&1
+      curl --max-time 2 -fsS "${api_base}/v1/models" > /dev/null 2>&1
       ;;
     openai)
       [[ -n "${COMAI_OPENAI_API_KEY:-}" ]] || return 2
-      curl --max-time 5 -fsS "${api_base}/v1/models" -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" >/dev/null 2>&1
+      curl --max-time 5 -fsS "${api_base}/v1/models" -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" > /dev/null 2>&1
       ;;
     *)
       return 1
@@ -287,13 +290,16 @@ comai_cmd_status() {
     done
   else
     case "$1" in
-      local|ollama|lmstudio|openai)
+      local | ollama | lmstudio | openai)
         if ! comai_cmd_status_one "$1"; then
           failed=1
           [[ "$1" == "$COMAI_PROVIDER" ]] && active_failed=1
         fi
         ;;
-      *) comai_error "usage: comai status [all|local|ollama|lmstudio|openai]"; return 1 ;;
+      *)
+        comai_error "usage: comai status [all|local|ollama|lmstudio|openai]"
+        return 1
+        ;;
     esac
   fi
 
@@ -323,17 +329,20 @@ comai_cmd_models() {
   fi
 
   case "$1" in
-    local|ollama|lmstudio|openai)
+    local | ollama | lmstudio | openai)
       comai_log info models "provider=$1"
       comai_provider_models "$1"
       ;;
-    *) comai_error "usage: comai models [all|local|ollama|lmstudio|openai]"; return 1 ;;
+    *)
+      comai_error "usage: comai models [all|local|ollama|lmstudio|openai]"
+      return 1
+      ;;
   esac
 }
 
 comai_cmd_provider() {
   case "${1:-}" in
-    ""|show|all)
+    "" | show | all)
       local provider status suffix
       printf 'active: %s\n' "$COMAI_PROVIDER"
       for provider in local ollama lmstudio openai; do
@@ -359,7 +368,7 @@ comai_cmd_provider() {
       ;;
     set)
       case "${2:-}" in
-        local|ollama|lmstudio|openai)
+        local | ollama | lmstudio | openai)
           comai_set_config_value provider "$2"
           printf 'Set provider to %s in %s\n' "$2" "$COMAI_CONFIG_FILE"
           ;;
@@ -457,7 +466,7 @@ comai_cmd_chat() {
     printf '> '
     IFS= read -r line || break
     case "$line" in
-      /exit|/quit) break ;;
+      /exit | /quit) break ;;
       "") continue ;;
     esac
     comai_run_request "$line" || return 1
@@ -483,8 +492,11 @@ comai_cmd_local_service() {
   local start_helper stop_helper
 
   case "$action" in
-    start|stop|restart) ;;
-    *) comai_error "usage: comai start|stop|restart"; return 1 ;;
+    start | stop | restart) ;;
+    *)
+      comai_error "usage: comai start|stop|restart"
+      return 1
+      ;;
   esac
 
   comai_log info service "$action requested service=$service_name ai_dir=$COMAI_AI_DIR"
@@ -568,7 +580,7 @@ comai_cmd_update() {
         return 1
       fi
       case "$source_ref" in
-        v*|refs/tags/*)
+        v* | refs/tags/*)
           archive_file="$tarball_base/refs/tags/${source_ref#refs/tags/}.tar.gz"
           ;;
         refs/heads/*)
@@ -668,13 +680,13 @@ comai_main() {
     history)
       comai_cmd_history "$@"
       ;;
-    start|stop|restart)
+    start | stop | restart)
       comai_cmd_local_service "$command"
       ;;
     update)
       comai_cmd_update "$@"
       ;;
-    version|--version|-V)
+    version | --version | -V)
       comai_cmd_version
       ;;
     uninstall)

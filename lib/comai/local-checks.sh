@@ -25,24 +25,24 @@ comai_first_matching_entry() {
 
   case "$order" in
     newest)
-      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2>/dev/null \
-        | sort -k1,1nr \
-        | head -n 1
+      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2> /dev/null |
+        sort -k1,1nr |
+        head -n 1
       ;;
     oldest)
-      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2>/dev/null \
-        | sort -k1,1n \
-        | head -n 1
+      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2> /dev/null |
+        sort -k1,1n |
+        head -n 1
       ;;
     largest)
-      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2>/dev/null \
-        | sort -k2,2nr \
-        | head -n 1
+      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2> /dev/null |
+        sort -k2,2nr |
+        head -n 1
       ;;
     smallest)
-      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2>/dev/null \
-        | sort -k2,2n \
-        | head -n 1
+      find . -maxdepth 1 -mindepth 1 "${type_args[@]}" -printf '%T@\t%s\t%TY-%Tm-%Td %TH:%TM\t%p\n' 2> /dev/null |
+        sort -k2,2n |
+        head -n 1
       ;;
   esac
 }
@@ -58,7 +58,7 @@ comai_answer_local_file_fact() {
   fi
 
   case "$text" in
-    *newest*|*latest*|*recent*)
+    *newest* | *latest* | *recent*)
       order="newest"
       label="newest"
       ;;
@@ -66,7 +66,7 @@ comai_answer_local_file_fact() {
       order="oldest"
       label="oldest"
       ;;
-    *biggest*|*largest*|*large*|*big-files*|*big\ files*)
+    *biggest* | *largest* | *large* | *big-files* | *big\ files*)
       order="largest"
       label="largest"
       ;;
@@ -99,10 +99,10 @@ comai_answer_file_contains() {
 
   text="$(printf '%s' "$request" | tr '[:upper:]' '[:lower:]')"
   case "$text" in
-    *see\ number\ *|*find\ number\ *|*has\ number\ *|*have\ number\ *|*contains\ number\ *)
+    *see\ number\ * | *find\ number\ * | *has\ number\ * | *have\ number\ * | *contains\ number\ *)
       needle="$(printf '%s' "$text" | sed -nE 's/.*(see|find|has|have|contains)[[:space:]]+number[[:space:]]+([0-9]+).*/\2/p' | head -n 1)"
       ;;
-    *see\ *|*find\ *|*contains\ *)
+    *see\ * | *find\ * | *contains\ *)
       needle=""
       ;;
     *)
@@ -114,10 +114,10 @@ comai_answer_file_contains() {
 
   for file in "${FILES[@]}"; do
     [[ -f "$file" && -r "$file" ]] || continue
-    count="$(grep -F -- "$needle" "$file" 2>/dev/null | wc -l | tr -d '[:space:]')"
+    count="$(grep -F -- "$needle" "$file" 2> /dev/null | wc -l | tr -d '[:space:]')"
     if [[ "$count" -gt 0 ]]; then
       printf 'Yes. `%s` appears in %s on %s line(s).\n' "$needle" "$file" "$count"
-      grep -nF -- "$needle" "$file" 2>/dev/null | head -5
+      grep -nF -- "$needle" "$file" 2> /dev/null | head -5
     else
       printf 'No. `%s` was not found in %s.\n' "$needle" "$file"
     fi
@@ -141,12 +141,12 @@ comai_answer_file_errors() {
   for file in "${FILES[@]}"; do
     [[ -f "$file" && -r "$file" ]] || continue
 
-    count="$(grep -Ein "$COMAI_ERROR_RE" "$file" 2>/dev/null | wc -l | tr -d '[:space:]')"
+    count="$(grep -Ein "$COMAI_ERROR_RE" "$file" 2> /dev/null | wc -l | tr -d '[:space:]')"
     if [[ "$count" -eq 0 ]]; then
       printf 'No error, warning, failure, panic, timeout, or traceback lines were found in %s.\n' "$file"
     else
       printf 'Found %s possible issue line(s) in %s:\n' "$count" "$file"
-      grep -Ein "$COMAI_ERROR_RE" "$file" 2>/dev/null | head -20
+      grep -Ein "$COMAI_ERROR_RE" "$file" 2> /dev/null | head -20
     fi
     return 0
   done
@@ -170,11 +170,11 @@ comai_answer_file_description() {
 
     size="$(wc -c < "$file" | tr -d '[:space:]')"
     lines="$(wc -l < "$file" | tr -d '[:space:]')"
-    first_line="$(sed -n '1p' "$file" 2>/dev/null)"
+    first_line="$(sed -n '1p' "$file" 2> /dev/null)"
 
     mime="text/plain"
     if comai_have file; then
-      mime="$(file -b --mime-type "$file" 2>/dev/null || printf 'unknown')"
+      mime="$(file -b --mime-type "$file" 2> /dev/null || printf 'unknown')"
     fi
 
     description="$mime file"
@@ -185,10 +185,10 @@ comai_answer_file_description() {
       "# "*)
         description="Markdown-style text document"
         ;;
-      *" License"|*" license")
+      *" License" | *" license")
         description="$first_line document"
         ;;
-      "{"*|"["*)
+      "{"* | "["*)
         description="structured data file"
         ;;
     esac

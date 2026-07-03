@@ -6,7 +6,7 @@ comai_ai_prompt() {
   local files="$3"
 
   if [[ -z "$dir_context" && -z "$files" ]]; then
-    cat <<EOF
+    cat << EOF
 User request:
 ${request}
 
@@ -15,7 +15,7 @@ EOF
     return
   fi
 
-  cat <<EOF
+  cat << EOF
 User request:
 ${request}
 
@@ -126,19 +126,19 @@ comai_ask_openai_compatible() {
         temperature: 0,
         max_tokens: ($max_tokens | tonumber),
         stream: false
-      }' \
-      | curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/chat/completions" \
-          -H 'Content-Type: application/json' \
-          --data-binary @-
+      }' |
+      curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/chat/completions" \
+        -H 'Content-Type: application/json' \
+        --data-binary @-
   )"
 
   http_status="$(printf '%s' "$response" | tail -n 1)"
   response_body="$(printf '%s' "$response" | sed '$d')"
   if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
     content="$(
-      printf '%s' "$response_body" \
-        | jq -r '(.error | if type == "object" then .message else . end) // empty' 2>/dev/null \
-        | comai_clean_ai_output
+      printf '%s' "$response_body" |
+        jq -r '(.error | if type == "object" then .message else . end) // empty' 2> /dev/null |
+        comai_clean_ai_output
     )"
     if [[ "$http_status" == "404" && "$content" == *"no router for requested model"* ]]; then
       comai_error "${label} is running, but the configured model was not found:"
@@ -155,9 +155,9 @@ comai_ask_openai_compatible() {
   fi
 
   content="$(
-    printf '%s' "$response_body" \
-      | jq -r '.choices[0].message.content // (.error | if type == "object" then .message else . end) // empty' \
-      | comai_clean_ai_output
+    printf '%s' "$response_body" |
+      jq -r '.choices[0].message.content // (.error | if type == "object" then .message else . end) // empty' |
+      comai_clean_ai_output
   )"
   if [[ -z "$content" ]]; then
     comai_error "${label} returned an empty response with model ${COMAI_MODEL}."
@@ -192,10 +192,10 @@ comai_ask_ollama() {
           num_predict: ($max_tokens | tonumber)
         },
         stream: false
-      }' \
-      | curl --max-time "$COMAI_TIMEOUT" -fsS "${COMAI_API_BASE}/api/chat" \
-          -H 'Content-Type: application/json' \
-          --data-binary @-
+      }' |
+      curl --max-time "$COMAI_TIMEOUT" -fsS "${COMAI_API_BASE}/api/chat" \
+        -H 'Content-Type: application/json' \
+        --data-binary @-
   )"
 
   content="$(printf '%s' "$response" | jq -r '.message.content // .error // empty' | comai_clean_ai_output)"
@@ -234,17 +234,17 @@ comai_ask_openai() {
           {role: "user", content: $prompt}
         ],
         max_output_tokens: ($max_tokens | tonumber)
-      }' \
-      | curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/responses" \
-          -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" \
-          -H 'Content-Type: application/json' \
-          --data-binary @-
+      }' |
+      curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/responses" \
+        -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" \
+        -H 'Content-Type: application/json' \
+        --data-binary @-
   )"
 
   http_status="$(printf '%s' "$response" | tail -n 1)"
   response_body="$(printf '%s' "$response" | sed '$d')"
   if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
-    content="$(printf '%s' "$response_body" | jq -r '.error.message // empty' 2>/dev/null | comai_clean_ai_output)"
+    content="$(printf '%s' "$response_body" | jq -r '.error.message // empty' 2> /dev/null | comai_clean_ai_output)"
     if [[ -n "$content" ]]; then
       comai_error "OpenAI API error ${http_status}: ${content}"
     else
@@ -254,9 +254,9 @@ comai_ask_openai() {
   fi
 
   content="$(
-    printf '%s' "$response_body" \
-      | jq -r '.output_text // ([.output[]?.content[]? | select(.type == "output_text") | .text] | join("\n")) // .error.message // empty' \
-      | comai_clean_ai_output
+    printf '%s' "$response_body" |
+      jq -r '.output_text // ([.output[]?.content[]? | select(.type == "output_text") | .text] | join("\n")) // .error.message // empty' |
+      comai_clean_ai_output
   )"
   if [[ -z "$content" ]]; then
     comai_error "OpenAI returned an empty response with model ${COMAI_MODEL}."

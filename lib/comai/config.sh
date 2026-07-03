@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 comai_have() {
-  command -v "$1" >/dev/null 2>&1
+  command -v "$1" > /dev/null 2>&1
 }
 
 comai_yaml_value() {
@@ -91,7 +91,7 @@ comai_secure_config_file() {
   local file="${1:-${COMAI_CONFIG_FILE:-}}"
 
   [[ -n "$file" && -f "$file" ]] || return 0
-  chmod 600 "$file" 2>/dev/null || true
+  chmod 600 "$file" 2> /dev/null || true
 }
 
 comai_expand_config_path() {
@@ -156,7 +156,7 @@ comai_set_provider_config_value() {
   local legacy_key
 
   legacy_key="$(comai_legacy_provider_config_key "$provider" "$key" || true)"
-  if grep -Eq "^[[:space:]]{2}${provider}[[:space:]]*:" "$file" 2>/dev/null; then
+  if grep -Eq "^[[:space:]]{2}${provider}[[:space:]]*:" "$file" 2> /dev/null; then
     awk -v provider="$provider" -v key="$key" -v value="$value" '
       BEGIN { in_providers = 0; in_provider = 0; changed = 0 }
       /^[^[:space:]#][^:]*:/ {
@@ -214,7 +214,7 @@ comai_resolve_openai_api_key() {
   fi
 
   if [[ -n "$key_cmd" ]]; then
-    resolved="$(sh -c "$key_cmd" 2>/dev/null | head -n 1 || true)"
+    resolved="$(sh -c "$key_cmd" 2> /dev/null | head -n 1 || true)"
     if [[ -n "$resolved" ]]; then
       printf '%s\n' "$resolved"
       return 0
@@ -314,7 +314,7 @@ comai_load_config() {
 }
 
 comai_usage() {
-  cat <<EOF
+  cat << EOF
 Usage:
   comai setup       Configure provider, API, and model
   comai ask         Ask one question
@@ -396,7 +396,7 @@ comai_join_args() {
 }
 
 comai_local_ai_ready() {
-  comai_have curl && curl --max-time 2 -fsS "${COMAI_API_BASE}/v1/models" >/dev/null 2>&1
+  comai_have curl && curl --max-time 2 -fsS "${COMAI_API_BASE}/v1/models" > /dev/null 2>&1
 }
 
 comai_select_openai_provider() {
