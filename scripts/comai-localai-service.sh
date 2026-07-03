@@ -8,16 +8,29 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_SCRIPT_PATH")/.." && pwd)"
 . "$COMAI_ROOT_DIR/lib/comai/config.sh"
 comai_load_config
 
+localai_helper() {
+  local name="$1"
+
+  if [[ -x "$COMAI_AI_DIR/bin/$name" ]]; then
+    printf '%s\n' "$COMAI_AI_DIR/bin/$name"
+  elif [[ -x "$COMAI_AI_DIR/$name" ]]; then
+    printf '%s\n' "$COMAI_AI_DIR/$name"
+  else
+    printf 'ComAI LocalAI helper not found: %s/bin/%s or %s/%s\n' "$COMAI_AI_DIR" "$name" "$COMAI_AI_DIR" "$name" >&2
+    exit 1
+  fi
+}
+
 case "${1:-start}" in
   start)
-    exec "$COMAI_AI_DIR/start.sh"
+    exec "$(localai_helper start.sh)"
     ;;
   stop)
-    exec "$COMAI_AI_DIR/stop.sh"
+    exec "$(localai_helper stop.sh)"
     ;;
   restart)
-    "$COMAI_AI_DIR/stop.sh"
-    exec "$COMAI_AI_DIR/start.sh"
+    "$(localai_helper stop.sh)"
+    exec "$(localai_helper start.sh)"
     ;;
   *)
     printf 'Usage: %s [start|stop|restart]\n' "$0" >&2

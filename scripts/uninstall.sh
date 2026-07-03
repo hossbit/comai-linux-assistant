@@ -274,4 +274,4 @@ if [[ "$ROOT_DIR" != "$INSTALL_DIR" ]]; then
 fi
 printf '  LocalAI install: %s\n' "$LOCALAI_DIR_NOTE"
 printf '\nComAI does not remove LocalAI. To remove LocalAI too, run:\n'
-printf '  %s/uninstall-local-ai.sh\n' "$LOCALAI_DIR_NOTE"
+printf '  %s/bin/uninstall-local-ai.sh\n' "$LOCALAI_DIR_NOTE"

@@ -17,7 +17,7 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.3.3"
+COMAI_VERSION="2.3.4"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
@@ -461,10 +461,23 @@ comai_cmd_chat() {
   done
 }
 
+comai_localai_helper() {
+  local name="$1"
+
+  if [[ -x "$COMAI_AI_DIR/bin/$name" ]]; then
+    printf '%s\n' "$COMAI_AI_DIR/bin/$name"
+  elif [[ -x "$COMAI_AI_DIR/$name" ]]; then
+    printf '%s\n' "$COMAI_AI_DIR/$name"
+  else
+    return 1
+  fi
+}
+
 comai_cmd_local_service() {
   local action="$1"
   local service_name="${COMAI_LOCALAI_SERVICE_NAME:-comai-localai.service}"
   local service_file="$HOME/.config/systemd/user/$service_name"
+  local start_helper stop_helper
 
   case "$action" in
     start|stop|restart) ;;
@@ -482,29 +495,29 @@ comai_cmd_local_service() {
 
   case "$action" in
     start)
-      if [[ ! -x "$COMAI_AI_DIR/start.sh" ]]; then
-        comai_log error service "start failed missing=$COMAI_AI_DIR/start.sh"
-        comai_error "start script not found or not executable: $COMAI_AI_DIR/start.sh"
+      if ! start_helper="$(comai_localai_helper start.sh)"; then
+        comai_log error service "start failed missing=$COMAI_AI_DIR/bin/start.sh"
+        comai_error "start script not found or not executable: $COMAI_AI_DIR/bin/start.sh"
         return 1
       fi
-      "$COMAI_AI_DIR/start.sh"
+      "$start_helper"
       ;;
     stop)
-      if [[ ! -x "$COMAI_AI_DIR/stop.sh" ]]; then
-        comai_log error service "stop failed missing=$COMAI_AI_DIR/stop.sh"
-        comai_error "stop script not found or not executable: $COMAI_AI_DIR/stop.sh"
+      if ! stop_helper="$(comai_localai_helper stop.sh)"; then
+        comai_log error service "stop failed missing=$COMAI_AI_DIR/bin/stop.sh"
+        comai_error "stop script not found or not executable: $COMAI_AI_DIR/bin/stop.sh"
         return 1
       fi
-      "$COMAI_AI_DIR/stop.sh"
+      "$stop_helper"
       ;;
     restart)
-      if [[ ! -x "$COMAI_AI_DIR/stop.sh" || ! -x "$COMAI_AI_DIR/start.sh" ]]; then
+      if ! stop_helper="$(comai_localai_helper stop.sh)" || ! start_helper="$(comai_localai_helper start.sh)"; then
         comai_log error service "restart failed missing_start_or_stop ai_dir=$COMAI_AI_DIR"
-        comai_error "restart requires executable scripts: $COMAI_AI_DIR/stop.sh and $COMAI_AI_DIR/start.sh"
+        comai_error "restart requires executable scripts: $COMAI_AI_DIR/bin/stop.sh and $COMAI_AI_DIR/bin/start.sh"
         return 1
       fi
-      "$COMAI_AI_DIR/stop.sh"
-      "$COMAI_AI_DIR/start.sh"
+      "$stop_helper"
+      "$start_helper"
       ;;
   esac
 
