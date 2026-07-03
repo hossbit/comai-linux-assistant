@@ -30,6 +30,11 @@ skipped() {
   printf 'Skipped: %s (%s)\n' "$path" "$reason"
 }
 
+fail() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 1
+}
+
 expand_path() {
   local value="$1"
   if [[ "$value" == "~" ]]; then
@@ -78,6 +83,42 @@ parse_args() {
         ;;
     esac
   done
+}
+
+validate_absolute_path() {
+  local label="$1"
+  local value="$2"
+
+  case "$value" in
+    /*) ;;
+    *) fail "$label must be an absolute path or start with ~" ;;
+  esac
+}
+
+validate_uninstall_dir_safety() {
+  local dir="$1"
+
+  case "$dir" in
+    / | "$HOME" | /bin | /sbin | /etc | /var | /home | /root | /boot | /usr | /usr/bin | /usr/sbin | /usr/local | /usr/local/bin | /opt)
+      fail "refusing unsafe uninstall directory: $dir"
+      ;;
+  esac
+}
+
+confirm_default_no() {
+  local prompt="$1"
+  local answer
+
+  if [[ ! -t 0 ]]; then
+    return 1
+  fi
+
+  printf '%s [y/N]: ' "$prompt"
+  read -r answer
+  case "${answer,,}" in
+    y | yes) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 yaml_value() {
@@ -200,6 +241,8 @@ remove_install_dir() {
     return
   fi
 
+  validate_uninstall_dir_safety "$INSTALL_DIR"
+
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     skipped "$INSTALL_DIR" "looks like a source checkout"
     return
@@ -210,12 +253,20 @@ remove_install_dir() {
     return
   fi
 
+  if ! confirm_default_no "Remove ComAI install directory $INSTALL_DIR?"; then
+    skipped "$INSTALL_DIR" "confirmation declined"
+    return
+  fi
+
   rm -rf "$INSTALL_DIR"
   removed "$INSTALL_DIR"
 }
 
 parse_args "$@"
 INSTALL_DIR="$(resolve_install_dir)"
+INSTALL_DIR="$(expand_path "$INSTALL_DIR")"
+validate_absolute_path "install directory" "$INSTALL_DIR"
+validate_uninstall_dir_safety "$INSTALL_DIR"
 if LOCALAI_DIR_NOTE="$(yaml_value ai_dir "$INSTALL_DIR/config/comai.yaml")"; then
   LOCALAI_DIR_NOTE="$(expand_path "$LOCALAI_DIR_NOTE")"
 else

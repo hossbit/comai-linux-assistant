@@ -4,6 +4,7 @@ set -euo pipefail
 COMAI_REPO_URL="${COMAI_REPO_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
 COMAI_REF="${COMAI_REF:-main}"
+COMAI_TARBALL_SHA256="${COMAI_TARBALL_SHA256:-}"
 COMAI_INSTALL_DIR="${COMAI_INSTALL_DIR:-$HOME/localcomai}"
 COMAI_AI_DIR="${COMAI_AI_DIR:-$HOME/ai}"
 
@@ -42,6 +43,7 @@ Environment:
   COMAI_INSTALL_DIR   Install directory. Default: $HOME/localcomai
   COMAI_AI_DIR        Optional LocalAI helper directory. Default: $HOME/ai
   COMAI_REF           Git branch or tag to install. Default: main
+  COMAI_TARBALL_SHA256  Expected SHA256 for tarball installs when git is unavailable
 EOF
 }
 
@@ -74,6 +76,12 @@ else
   have tar || fail "git or tar is required."
   archive_file="$tmp_dir/comai.tar.gz"
   curl -fsSL "$(archive_url)" -o "$archive_file"
+  if [[ -n "$COMAI_TARBALL_SHA256" ]]; then
+    have sha256sum || fail "sha256sum is required to verify COMAI_TARBALL_SHA256."
+    printf '%s  %s\n' "$COMAI_TARBALL_SHA256" "$archive_file" | sha256sum -c -
+  else
+    log "No COMAI_TARBALL_SHA256 provided; tarball integrity was not verified."
+  fi
   mkdir -p "$source_dir"
   tar -xzf "$archive_file" -C "$tmp_dir"
   extracted="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -name 'comai-linux-assistant-*' | head -n 1)"

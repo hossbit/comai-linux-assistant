@@ -19,6 +19,7 @@ COMAI_VERSION=""
 INSTALL_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 INSTALL_SOURCE_REF="${COMAI_REF:-main}"
 INSTALL_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
+INSTALL_TARBALL_SHA256="${COMAI_TARBALL_SHA256:-}"
 
 section() {
   printf '\n== %s ==\n' "$1"
@@ -112,11 +113,17 @@ install_dir_is_empty() {
   [[ -z "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2> /dev/null)" ]]
 }
 
+looks_like_comai_install_dir() {
+  local dir="$1"
+
+  [[ -x "$dir/bin/comai" && -d "$dir/lib/comai" && -f "$dir/config/comai.yaml" ]]
+}
+
 install_dir_has_comai_marker() {
   local dir="$1"
 
-  [[ -f "$dir/.install-meta" ]] && grep -Fq "COMAI_INSTALL_VERSION=" "$dir/.install-meta" && return 0
-  [[ -f "$dir/.install-meta/comai" ]] && return 0
+  [[ -f "$dir/.install-meta" ]] && grep -Fq "COMAI_INSTALL_VERSION=" "$dir/.install-meta" && looks_like_comai_install_dir "$dir" && return 0
+  [[ -f "$dir/.install-meta/comai" ]] && looks_like_comai_install_dir "$dir" && return 0
   return 1
 }
 
@@ -124,7 +131,7 @@ validate_install_dir_safety() {
   local dir="$1"
 
   case "$dir" in
-    / | "$HOME" | /bin | /sbin | /usr | /usr/bin | /usr/sbin | /usr/local | /usr/local/bin | /opt)
+    / | "$HOME" | /bin | /sbin | /etc | /var | /home | /root | /boot | /usr | /usr/bin | /usr/sbin | /usr/local | /usr/local/bin | /opt)
       fail "refusing unsafe install directory: $dir"
       ;;
   esac
@@ -247,13 +254,16 @@ install_packages_for_missing_commands() {
   printf 'The installer can install the matching OS packages when supported.\n'
 
   if command -v apt-get > /dev/null 2>&1; then
+    confirm_default_yes "Install required packages with apt: ${packages[*]}?" || fail "missing required commands: ${MISSING_COMMANDS[*]}"
     printf 'Installing required packages with apt: %s\n' "${packages[*]}"
     sudo apt-get update
     sudo apt-get install -y "${packages[@]}"
   elif command -v dnf > /dev/null 2>&1; then
+    confirm_default_yes "Install required packages with dnf: ${packages[*]}?" || fail "missing required commands: ${MISSING_COMMANDS[*]}"
     printf 'Installing required packages with dnf: %s\n' "${packages[*]}"
     sudo dnf install -y "${packages[@]}"
   elif command -v pacman > /dev/null 2>&1; then
+    confirm_default_yes "Install required packages with pacman: ${packages[*]}?" || fail "missing required commands: ${MISSING_COMMANDS[*]}"
     printf 'Installing required packages with pacman: %s\n' "${packages[*]}"
     sudo pacman -S --needed "${packages[@]}"
   else
@@ -331,19 +341,44 @@ ensure_path_config() {
       printf '\n# Added by ComAI installer\n%s\n' "$fish_line" >> "$config_file"
     fi
   else
-    line='export PATH="$HOME/.local/bin:$PATH"'
+    line='export PATH="$PATH:$HOME/.local/bin"'
     if ! grep -Fqx "$line" "$config_file" 2> /dev/null; then
       printf '\n# Added by ComAI installer\n%s\n' "$line" >> "$config_file"
     fi
   fi
 
-  PATH_NOTE="Added $BIN_DIR to $config_file. Restart your shell or run: export PATH=\"\$HOME/.local/bin:\$PATH\""
+  PATH_NOTE="Added $BIN_DIR to $config_file. Restart your shell or run: export PATH=\"\$PATH:\$HOME/.local/bin\""
+}
+
+validate_config_key() {
+  local key="$1"
+
+  [[ "$key" =~ ^[A-Za-z0-9_.-]+$ ]] || fail "invalid config key: $key"
+}
+
+validate_config_value() {
+  local value="$1"
+
+  case "$value" in
+    *$'\n'* | *$'\r'*) fail "config values cannot contain newlines" ;;
+  esac
+}
+
+secure_temp_for() {
+  local file="$1"
+  local dir base tmp
+
+  dir="$(dirname "$file")"
+  base="$(basename "$file")"
+  tmp="$(mktemp "$dir/.${base}.tmp.XXXXXX")" || return 1
+  chmod 600 "$tmp" 2> /dev/null || true
+  printf '%s\n' "$tmp"
 }
 
 merge_missing_config_defaults() {
   local source_config="$1"
   local target_config="$2"
-  local line block key added=()
+  local line block key tmp added=()
 
   if ! grep -Eq "^[[:space:]]*providers[[:space:]]*:" "$target_config"; then
     {
@@ -406,6 +441,7 @@ merge_missing_config_defaults() {
         exit(found ? 0 : 1)
       }
     ' "$target_config"; then
+    tmp="$(secure_temp_for "$target_config")"
     awk '
       BEGIN { in_providers = 0; in_openai = 0; added = 0 }
       /^[^[:space:]#][^:]*:/ {
@@ -446,7 +482,10 @@ merge_missing_config_defaults() {
           print "    api_key_cmd:"
         }
       }
-    ' "$target_config" > "${target_config}.tmp" && mv "${target_config}.tmp" "$target_config"
+    ' "$target_config" > "$tmp" && mv "$tmp" "$target_config"
+    if [[ -e "${tmp:-}" ]]; then
+      rm -f "$tmp"
+    fi
     added+=("providers.openai.api_key_cmd")
   fi
 
@@ -459,7 +498,7 @@ merge_missing_config_defaults() {
 
 normalize_openai_api_key_cmd_config() {
   local target_config="$1"
-  local top_level_cmd nested_cmd
+  local top_level_cmd nested_cmd tmp
 
   top_level_cmd="$(awk '
     /^api_key_cmd[[:space:]]*:/ {
@@ -494,6 +533,7 @@ normalize_openai_api_key_cmd_config() {
 
   [[ -n "$top_level_cmd" || -n "$nested_cmd" ]] || return 0
 
+  tmp="$(secure_temp_for "$target_config")"
   awk -v top_level_cmd="$top_level_cmd" '
     BEGIN { in_providers = 0; in_openai = 0; wrote_cmd = 0 }
     /^api_key_cmd[[:space:]]*:/ {
@@ -560,7 +600,10 @@ normalize_openai_api_key_cmd_config() {
         print "    api_key_cmd: " top_level_cmd
       }
     }
-  ' "$target_config" > "${target_config}.tmp" && mv "${target_config}.tmp" "$target_config"
+  ' "$target_config" > "$tmp" && mv "$tmp" "$target_config"
+  if [[ -e "${tmp:-}" ]]; then
+    rm -f "$tmp"
+  fi
 }
 
 install_config() {
@@ -594,6 +637,8 @@ set_config_value() {
   local target_config="$INSTALL_DIR/config/comai.yaml"
   local escaped_value
 
+  validate_config_key "$key"
+  validate_config_value "$value"
   escaped_value="${value//\\/\\\\}"
   escaped_value="${escaped_value//&/\\&}"
   escaped_value="${escaped_value//|/\\|}"
@@ -734,6 +779,7 @@ COMAI_INSTALL_VERSION="${COMAI_VERSION:-unknown}"
 COMAI_INSTALL_SOURCE_URL="$INSTALL_SOURCE_URL"
 COMAI_INSTALL_SOURCE_REF="$INSTALL_SOURCE_REF"
 COMAI_INSTALL_TARBALL_BASE="$INSTALL_TARBALL_BASE"
+COMAI_INSTALL_TARBALL_SHA256="$INSTALL_TARBALL_SHA256"
 COMAI_INSTALL_SOURCE_DIR="$ROOT_DIR"
 COMAI_INSTALL_DATE="$(date '+%Y-%m-%d %H:%M:%S')"
 EOF

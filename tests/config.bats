@@ -22,8 +22,9 @@ EOF
   [ "$output" = "test-model" ]
 }
 
-@test "load config resolves OpenAI API key from command and tightens permissions" {
+@test "OpenAI API key command resolves lazily and tightens permissions" {
   config="$BATS_TEST_TMPDIR/comai.yaml"
+  key_file="$BATS_TEST_TMPDIR/key"
   cat > "$config" << 'EOF'
 provider: openai
 providers:
@@ -31,8 +32,9 @@ providers:
     api_base: https://api.openai.com
     model: test-model
     api_key:
-    api_key_cmd: printf cmd-key
 EOF
+  printf '    api_key_cmd: cat %s\n' "$key_file" >> "$config"
+  printf 'cmd-key\n' > "$key_file"
   chmod 644 "$config"
 
   COMAI_CONFIG="$config"
@@ -40,8 +42,11 @@ EOF
   COMAI_OPENAI_API_KEY=""
   comai_load_config
 
-  [ "$COMAI_OPENAI_API_KEY" = "cmd-key" ]
+  [ "$COMAI_OPENAI_API_KEY" = "" ]
   [ "$(stat -c %a "$config")" = "600" ]
+  run comai_ensure_openai_api_key
+  [ "$status" -eq 0 ]
+  [ "$COMAI_OPENAI_API_KEY" = "cmd-key" ]
 }
 
 @test "OPENAI_API_KEY overrides configured key command" {
@@ -81,7 +86,30 @@ EOF
   COMAI_OPENAI_API_KEY=""
   comai_load_config
 
+  run comai_ensure_openai_api_key
+  [ "$status" -eq 0 ]
   [ "$COMAI_OPENAI_API_KEY" = "fallback-key" ]
+}
+
+@test "local provider load does not run OpenAI API key command" {
+  config="$BATS_TEST_TMPDIR/comai.yaml"
+  marker="$BATS_TEST_TMPDIR/marker"
+  cat > "$config" << EOF
+provider: local
+providers:
+  openai:
+    api_base: https://api.openai.com
+    model: test-model
+    api_key:
+    api_key_cmd: touch $marker
+EOF
+
+  COMAI_CONFIG="$config"
+  OPENAI_API_KEY=""
+  COMAI_OPENAI_API_KEY=""
+  comai_load_config
+
+  [ ! -e "$marker" ]
 }
 
 @test "config set api_key_cmd writes nested OpenAI provider key" {

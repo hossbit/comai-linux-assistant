@@ -17,10 +17,11 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.3.9"
+COMAI_VERSION="2.3.10"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
+COMAI_TARBALL_SHA256="${COMAI_TARBALL_SHA256:-}"
 COMAI_REF="${COMAI_REF:-main}"
 
 comai_log() {
@@ -28,20 +29,30 @@ comai_log() {
   local event="$2"
   shift 2
 
+  [[ "${COMAI_LOG_ENABLED:-1}" != "0" ]] || return 0
   [[ -n "${COMAI_LOG_FILE:-}" ]] || return 0
   mkdir -p "$(dirname "$COMAI_LOG_FILE")"
-  printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$event" "$*" >> "$COMAI_LOG_FILE"
+  chmod 700 "$(dirname "$COMAI_LOG_FILE")" 2> /dev/null || true
+  {
+    umask 077
+    printf '%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$event" "$*" >> "$COMAI_LOG_FILE"
+  }
+  chmod 600 "$COMAI_LOG_FILE" 2> /dev/null || true
 }
 
 comai_history_add() {
   local request="$1"
   local response="$2"
 
+  [[ "${COMAI_HISTORY_ENABLED:-1}" != "0" ]] || return 0
   mkdir -p "$(dirname "$COMAI_HISTORY_FILE")"
+  chmod 700 "$(dirname "$COMAI_HISTORY_FILE")" 2> /dev/null || true
   {
+    umask 077
     printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$COMAI_PROVIDER/$COMAI_MODEL" "$request"
     printf '%s\n\n' "$response"
   } >> "$COMAI_HISTORY_FILE"
+  chmod 600 "$COMAI_HISTORY_FILE" 2> /dev/null || true
 }
 
 comai_read_stdin_if_piped() {
@@ -105,7 +116,7 @@ comai_run_request() {
     comai_log error request_failed "provider=$COMAI_PROVIDER model=$COMAI_MODEL"
     return 1
   fi
-  printf '%s\n' "$response"
+  printf '%s\n' "$response" | comai_strip_terminal_controls
   comai_history_add "$text" "$response"
   comai_log info request_ok "provider=$COMAI_PROVIDER model=$COMAI_MODEL response_chars=${#response}"
 }
@@ -208,8 +219,8 @@ comai_provider_status() {
       curl --max-time 2 -fsS "${api_base}/v1/models" > /dev/null 2>&1
       ;;
     openai)
-      [[ -n "${COMAI_OPENAI_API_KEY:-}" ]] || return 2
-      curl --max-time 5 -fsS "${api_base}/v1/models" -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" > /dev/null 2>&1
+      comai_ensure_openai_api_key || return 2
+      comai_curl_openai_auth "$COMAI_OPENAI_API_KEY" --max-time 5 -fsS "${api_base}/v1/models" > /dev/null 2>&1
       ;;
     *)
       return 1
@@ -233,11 +244,11 @@ comai_provider_models() {
       curl --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/v1/models" | jq -r '.data[]?.id'
       ;;
     openai)
-      [[ -n "${COMAI_OPENAI_API_KEY:-}" ]] || {
+      comai_ensure_openai_api_key || {
         comai_error "OPENAI_API_KEY or openai_api_key is required for OpenAI."
         return 1
       }
-      curl --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/v1/models" -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" | jq -r '.data[]?.id'
+      comai_curl_openai_auth "$COMAI_OPENAI_API_KEY" --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/v1/models" | jq -r '.data[]?.id'
       ;;
   esac
 }
@@ -252,6 +263,11 @@ comai_cmd_status_one() {
   printf 'Model: %s\n' "$model"
   printf 'API base: %s\n' "$api_base"
 
+  if [[ "$provider" == "openai" && "${COMAI_STATUS_EXPLICIT_PROVIDER:-}" == "openai" ]]; then
+    COMAI_ALLOW_OPENAI_KEY_CMD=1
+  else
+    COMAI_ALLOW_OPENAI_KEY_CMD=0
+  fi
   if comai_provider_status "$provider"; then
     printf 'Connection: ok\n'
     comai_log info provider_status_check "provider=$provider status=ok"
@@ -291,6 +307,7 @@ comai_cmd_status() {
   else
     case "$1" in
       local | ollama | lmstudio | openai)
+        COMAI_STATUS_EXPLICIT_PROVIDER="$1"
         if ! comai_cmd_status_one "$1"; then
           failed=1
           [[ "$1" == "$COMAI_PROVIDER" ]] && active_failed=1
@@ -320,6 +337,9 @@ comai_cmd_models() {
   if [[ "${1:-all}" == "all" ]]; then
     for provider in local ollama lmstudio openai; do
       printf '%s%s:\n' "$provider" "$([[ "$provider" == "$COMAI_PROVIDER" ]] && printf ' (active)')"
+      if [[ "$provider" == "openai" && "$COMAI_PROVIDER" != "openai" ]]; then
+        COMAI_ALLOW_OPENAI_KEY_CMD=0
+      fi
       if ! comai_provider_models "$provider" | sed 's/^/  /'; then
         printf '  unavailable\n'
       fi
@@ -331,6 +351,7 @@ comai_cmd_models() {
   case "$1" in
     local | ollama | lmstudio | openai)
       comai_log info models "provider=$1"
+      [[ "$1" == "openai" ]] && COMAI_ALLOW_OPENAI_KEY_CMD=1
       comai_provider_models "$1"
       ;;
     *)
@@ -459,13 +480,31 @@ comai_cmd_config() {
 comai_cmd_history() {
   if [[ -f "$COMAI_HISTORY_FILE" ]]; then
     if comai_have tail; then
-      tail -n "${1:-80}" "$COMAI_HISTORY_FILE"
+      tail -n "${1:-80}" "$COMAI_HISTORY_FILE" | comai_strip_terminal_controls
     else
-      sed -n '1,220p' "$COMAI_HISTORY_FILE"
+      sed -n '1,220p' "$COMAI_HISTORY_FILE" | comai_strip_terminal_controls
     fi
   else
     printf 'No history yet.\n'
   fi
+}
+
+comai_install_meta_value() {
+  local key="$1"
+  local file="$2"
+
+  awk -v key="$key" '
+    $0 ~ "^[[:space:]]*" key "=" {
+      value = substr($0, index($0, "=") + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      if (value ~ /^".*"$/) {
+        value = substr(value, 2, length(value) - 2)
+      }
+      print value
+      exit
+    }
+  ' "$file"
 }
 
 comai_cmd_chat() {
@@ -555,7 +594,7 @@ comai_cmd_version() {
 }
 
 comai_cmd_update() {
-  local temp_dir source_dir status source_url source_ref tarball_base archive_file extracted
+  local temp_dir source_dir status source_url source_ref tarball_base tarball_sha256 archive_file extracted
 
   if [[ -d "$COMAI_ROOT_DIR/.git" ]]; then
     printf 'Updating git checkout: %s\n' "$COMAI_ROOT_DIR"
@@ -564,12 +603,16 @@ comai_cmd_update() {
     source_url="$COMAI_SOURCE_URL"
     source_ref="$COMAI_REF"
     tarball_base="$COMAI_TARBALL_BASE"
+    tarball_sha256="$COMAI_TARBALL_SHA256"
     if [[ -f "$COMAI_ROOT_DIR/.install-meta" ]]; then
-      # shellcheck source=/dev/null
-      . "$COMAI_ROOT_DIR/.install-meta"
-      source_url="${COMAI_INSTALL_SOURCE_URL:-$COMAI_SOURCE_URL}"
-      source_ref="${COMAI_INSTALL_SOURCE_REF:-$COMAI_REF}"
-      tarball_base="${COMAI_INSTALL_TARBALL_BASE:-$COMAI_TARBALL_BASE}"
+      source_url="$(comai_install_meta_value COMAI_INSTALL_SOURCE_URL "$COMAI_ROOT_DIR/.install-meta")"
+      source_ref="$(comai_install_meta_value COMAI_INSTALL_SOURCE_REF "$COMAI_ROOT_DIR/.install-meta")"
+      tarball_base="$(comai_install_meta_value COMAI_INSTALL_TARBALL_BASE "$COMAI_ROOT_DIR/.install-meta")"
+      tarball_sha256="$(comai_install_meta_value COMAI_INSTALL_TARBALL_SHA256 "$COMAI_ROOT_DIR/.install-meta")"
+      source_url="${source_url:-$COMAI_SOURCE_URL}"
+      source_ref="${source_ref:-$COMAI_REF}"
+      tarball_base="${tarball_base:-$COMAI_TARBALL_BASE}"
+      tarball_sha256="${tarball_sha256:-$COMAI_TARBALL_SHA256}"
     fi
     temp_dir="$(mktemp -d)"
     source_dir="$temp_dir/source"
@@ -605,6 +648,20 @@ comai_cmd_update() {
         rm -rf "$temp_dir"
         return "$status"
       fi
+      if [[ -n "$tarball_sha256" ]]; then
+        if ! comai_have sha256sum; then
+          comai_error "sha256sum is required to verify COMAI_TARBALL_SHA256."
+          rm -rf "$temp_dir"
+          return 1
+        fi
+        if ! printf '%s  %s\n' "$tarball_sha256" "$temp_dir/comai.tar.gz" | sha256sum -c -; then
+          status=$?
+          rm -rf "$temp_dir"
+          return "$status"
+        fi
+      else
+        comai_error "No COMAI_TARBALL_SHA256 provided; tarball integrity was not verified."
+      fi
       if ! tar -xzf "$temp_dir/comai.tar.gz" -C "$temp_dir"; then
         status=$?
         rm -rf "$temp_dir"
@@ -626,7 +683,7 @@ comai_cmd_update() {
       return 1
     fi
 
-    COMAI_SOURCE_URL="$source_url" COMAI_REF="$source_ref" COMAI_TARBALL_BASE="$tarball_base" \
+    COMAI_SOURCE_URL="$source_url" COMAI_REF="$source_ref" COMAI_TARBALL_BASE="$tarball_base" COMAI_TARBALL_SHA256="$tarball_sha256" \
       bash "$source_dir/scripts/install.sh" --dir "$COMAI_ROOT_DIR" --ai-dir "$COMAI_AI_DIR"
     status=$?
     rm -rf "$temp_dir"

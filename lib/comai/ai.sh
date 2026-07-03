@@ -31,7 +31,7 @@ EOF
 }
 
 comai_clean_ai_output() {
-  sed -E '
+  comai_strip_terminal_controls | sed -E '
     s/[[:space:]]+$//;
     s/`{2,}/`/g;
     s/[,،]{2,}/,/g;
@@ -132,8 +132,12 @@ comai_ask_openai_compatible() {
         --data-binary @-
   )"
 
-  http_status="$(printf '%s' "$response" | tail -n 1)"
-  response_body="$(printf '%s' "$response" | sed '$d')"
+  http_status="${response##*$'\n'}"
+  response_body="${response%$'\n'*}"
+  if [[ ! "$http_status" =~ ^[0-9]{3}$ ]]; then
+    comai_error "${label} API request did not return an HTTP status."
+    return 1
+  fi
   if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
     content="$(
       printf '%s' "$response_body" |
@@ -216,7 +220,7 @@ comai_ask_openai() {
     return 1
   fi
 
-  if [[ -z "${COMAI_OPENAI_API_KEY:-}" ]]; then
+  if ! comai_ensure_openai_api_key; then
     comai_error "OpenAI API key is required for ChatGPT requests."
     comai_error "Set openai_api_key in config/comai.yaml or export OPENAI_API_KEY."
     return 1
@@ -235,14 +239,18 @@ comai_ask_openai() {
         ],
         max_output_tokens: ($max_tokens | tonumber)
       }' |
-      curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/responses" \
-        -H "Authorization: Bearer ${COMAI_OPENAI_API_KEY}" \
+      comai_curl_openai_auth "$COMAI_OPENAI_API_KEY" \
+        --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/responses" \
         -H 'Content-Type: application/json' \
         --data-binary @-
   )"
 
-  http_status="$(printf '%s' "$response" | tail -n 1)"
-  response_body="$(printf '%s' "$response" | sed '$d')"
+  http_status="${response##*$'\n'}"
+  response_body="${response%$'\n'*}"
+  if [[ ! "$http_status" =~ ^[0-9]{3}$ ]]; then
+    comai_error "OpenAI API request did not return an HTTP status."
+    return 1
+  fi
   if [[ "$http_status" -lt 200 || "$http_status" -ge 300 ]]; then
     content="$(printf '%s' "$response_body" | jq -r '.error.message // empty' 2> /dev/null | comai_clean_ai_output)"
     if [[ -n "$content" ]]; then

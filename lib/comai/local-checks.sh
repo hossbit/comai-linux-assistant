@@ -117,7 +117,7 @@ comai_answer_file_contains() {
     count="$(grep -F -- "$needle" "$file" 2> /dev/null | wc -l | tr -d '[:space:]')"
     if [[ "$count" -gt 0 ]]; then
       printf 'Yes. `%s` appears in %s on %s line(s).\n' "$needle" "$file" "$count"
-      grep -nF -- "$needle" "$file" 2> /dev/null | head -5
+      grep -nF -- "$needle" "$file" 2> /dev/null | head -5 | comai_strip_terminal_controls
     else
       printf 'No. `%s` was not found in %s.\n' "$needle" "$file"
     fi
@@ -141,12 +141,14 @@ comai_answer_file_errors() {
   for file in "${FILES[@]}"; do
     [[ -f "$file" && -r "$file" ]] || continue
 
-    count="$(grep -Ein "$COMAI_ERROR_RE" "$file" 2> /dev/null | wc -l | tr -d '[:space:]')"
+    count="$(grep -Eic "$COMAI_ERROR_RE" "$file" 2> /dev/null || true)"
+    count="${count//[[:space:]]/}"
+    count="${count:-0}"
     if [[ "$count" -eq 0 ]]; then
       printf 'No error, warning, failure, panic, timeout, or traceback lines were found in %s.\n' "$file"
     else
       printf 'Found %s possible issue line(s) in %s:\n' "$count" "$file"
-      grep -Ein "$COMAI_ERROR_RE" "$file" 2> /dev/null | head -20
+      grep -Ein "$COMAI_ERROR_RE" "$file" 2> /dev/null | head -20 | comai_strip_terminal_controls
     fi
     return 0
   done
@@ -194,7 +196,7 @@ comai_answer_file_description() {
     esac
 
     if [[ -n "$first_line" ]]; then
-      printf '%s is a %s (%s, %s line(s), %s). First line: %s\n' "$file" "$description" "$(comai_human_bytes "$size")" "$lines" "$mime" "$first_line"
+      printf '%s is a %s (%s, %s line(s), %s). First line: %s\n' "$file" "$description" "$(comai_human_bytes "$size")" "$lines" "$mime" "$first_line" | comai_strip_terminal_controls
     else
       printf '%s is a %s (%s, %s line(s)).\n' "$file" "$description" "$(comai_human_bytes "$size")" "$lines"
     fi

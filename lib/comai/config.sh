@@ -94,6 +94,53 @@ comai_secure_config_file() {
   chmod 600 "$file" 2> /dev/null || true
 }
 
+comai_config_trusted_for_commands() {
+  local file="${1:-${COMAI_CONFIG_FILE:-}}"
+  local owner mode current_uid group_write other_write
+
+  [[ -n "$file" && -f "$file" ]] || return 1
+  owner="$(stat -c '%u' "$file" 2> /dev/null || true)"
+  mode="$(stat -c '%a' "$file" 2> /dev/null || true)"
+  current_uid="$(id -u 2> /dev/null || true)"
+  [[ -n "$owner" && -n "$mode" && -n "$current_uid" ]] || return 1
+  [[ "$owner" == "$current_uid" ]] || return 1
+
+  group_write=$(( (10#$mode / 10) % 10 & 2 ))
+  other_write=$(( 10#$mode % 10 & 2 ))
+  [[ "$group_write" -eq 0 && "$other_write" -eq 0 ]]
+}
+
+comai_validate_config_key() {
+  local key="$1"
+
+  [[ "$key" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+    comai_error "invalid config key: $key"
+    return 1
+  }
+}
+
+comai_validate_config_value() {
+  local value="$1"
+
+  case "$value" in
+    *$'\n'* | *$'\r'*)
+      comai_error "config values cannot contain newlines."
+      return 1
+      ;;
+  esac
+}
+
+comai_secure_temp_for() {
+  local file="$1"
+  local dir base tmp
+
+  dir="$(dirname "$file")"
+  base="$(basename "$file")"
+  tmp="$(mktemp "$dir/.${base}.tmp.XXXXXX")" || return 1
+  chmod 600 "$tmp" 2> /dev/null || true
+  printf '%s\n' "$tmp"
+}
+
 comai_expand_config_path() {
   local value="$1"
 
@@ -110,6 +157,8 @@ comai_set_config_value() {
   local file="${3:-$COMAI_CONFIG_FILE}"
   local escaped_value
 
+  comai_validate_config_key "$key" || return 1
+  comai_validate_config_value "$value" || return 1
   [[ -n "$file" ]] || {
     comai_error "config file is not known."
     return 1
@@ -154,10 +203,15 @@ comai_set_provider_config_value() {
   local key="$2"
   local value="$3"
   local file="${4:-$COMAI_CONFIG_FILE}"
-  local legacy_key
+  local legacy_key tmp
+
+  comai_validate_config_key "$provider" || return 1
+  comai_validate_config_key "$key" || return 1
+  comai_validate_config_value "$value" || return 1
 
   legacy_key="$(comai_legacy_provider_config_key "$provider" "$key" || true)"
   if grep -Eq "^[[:space:]]{2}${provider}[[:space:]]*:" "$file" 2> /dev/null; then
+    tmp="$(comai_secure_temp_for "$file")" || return 1
     awk -v provider="$provider" -v key="$key" -v value="$value" '
       BEGIN { in_providers = 0; in_provider = 0; changed = 0 }
       /^[^[:space:]#][^:]*:/ {
@@ -187,7 +241,10 @@ comai_set_provider_config_value() {
           print "    " key ": " value
         }
       }
-    ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    ' "$file" > "$tmp" && mv "$tmp" "$file"
+    if [[ -e "${tmp:-}" ]]; then
+      rm -f "$tmp"
+    fi
     comai_secure_config_file "$file"
     if [[ -n "$legacy_key" ]] && grep -Eq "^[[:space:]]*${legacy_key}[[:space:]]*:" "$file"; then
       comai_set_config_value "$legacy_key" "$value" "$file"
@@ -215,6 +272,11 @@ comai_resolve_openai_api_key() {
   fi
 
   if [[ -n "$key_cmd" ]]; then
+    if ! comai_config_trusted_for_commands "$COMAI_CONFIG_FILE"; then
+      printf 'comai: refusing to run openai api_key_cmd from untrusted config: %s\n' "$COMAI_CONFIG_FILE" >&2
+      printf '%s\n' "$config_key"
+      return 0
+    fi
     resolved="$(sh -c "$key_cmd" 2> /dev/null | head -n 1 || true)"
     if [[ -n "$resolved" ]]; then
       printf '%s\n' "$resolved"
@@ -223,6 +285,39 @@ comai_resolve_openai_api_key() {
   fi
 
   printf '%s\n' "$config_key"
+}
+
+comai_ensure_openai_api_key() {
+  if [[ -n "${COMAI_OPENAI_API_KEY:-}" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${COMAI_OPENAI_API_KEY_CMD:-}" &&
+    "${COMAI_PROVIDER:-}" != "openai" &&
+    "${COMAI_ALLOW_OPENAI_KEY_CMD:-0}" != "1" ]]; then
+    return 1
+  fi
+
+  COMAI_OPENAI_API_KEY="$(comai_resolve_openai_api_key "${COMAI_OPENAI_API_KEY_CMD:-}" "${COMAI_OPENAI_CONFIG_API_KEY:-}")"
+  [[ -n "${COMAI_OPENAI_API_KEY:-}" ]]
+}
+
+comai_curl_config_quote() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+comai_curl_openai_auth() {
+  local key="$1"
+  shift
+
+  curl "$@" --config /dev/fd/3 3<<< "header = \"Authorization: Bearer $(comai_curl_config_quote "$key")\""
+}
+
+comai_strip_terminal_controls() {
+  LC_ALL=C tr -d '\000-\010\013\014\016-\037\177'
 }
 
 comai_load_config() {
@@ -304,7 +399,8 @@ comai_load_config() {
     esac
   fi
   COMAI_OPENAI_API_KEY_CMD="${COMAI_OPENAI_API_KEY_CMD:-${openai_api_key_cmd}}"
-  COMAI_OPENAI_API_KEY="$(comai_resolve_openai_api_key "$COMAI_OPENAI_API_KEY_CMD" "$openai_api_key")"
+  COMAI_OPENAI_CONFIG_API_KEY="${COMAI_OPENAI_CONFIG_API_KEY:-${openai_api_key}}"
+  COMAI_OPENAI_API_KEY="${COMAI_OPENAI_API_KEY:-${OPENAI_API_KEY:-${COMAI_OPENAI_CONFIG_API_KEY}}}"
   COMAI_MAX_TOKENS="${COMAI_MAX_TOKENS:-${max_tokens:-420}}"
   COMAI_TIMEOUT="${COMAI_TIMEOUT:-${timeout:-120}}"
   COMAI_LOG_FILE="${COMAI_LOG_FILE:-$(comai_expand_config_path "${log_file:-logs/comai.log}")}"
