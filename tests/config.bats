@@ -44,8 +44,7 @@ EOF
 
   [ "$COMAI_OPENAI_API_KEY" = "" ]
   [ "$(stat -c %a "$config")" = "600" ]
-  run comai_ensure_openai_api_key
-  [ "$status" -eq 0 ]
+  comai_ensure_openai_api_key
   [ "$COMAI_OPENAI_API_KEY" = "cmd-key" ]
 }
 
@@ -86,8 +85,7 @@ EOF
   COMAI_OPENAI_API_KEY=""
   comai_load_config
 
-  run comai_ensure_openai_api_key
-  [ "$status" -eq 0 ]
+  comai_ensure_openai_api_key
   [ "$COMAI_OPENAI_API_KEY" = "fallback-key" ]
 }
 
