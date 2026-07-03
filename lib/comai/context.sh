@@ -30,6 +30,8 @@ comai_add_file_once() {
 comai_detect_mentioned_files() {
   local arg word candidate
 
+  [[ "${COMAI_PROVIDER:-local}" == "local" ]] || return 0
+
   for arg in "${REQUEST_ARGS[@]}"; do
     read -r -a PARTS <<< "$arg"
     for word in "${PARTS[@]}"; do

@@ -87,6 +87,13 @@ comai_trim_trailing_slashes() {
   printf '%s\n' "$value"
 }
 
+comai_secure_config_file() {
+  local file="${1:-${COMAI_CONFIG_FILE:-}}"
+
+  [[ -n "$file" && -f "$file" ]] || return 0
+  chmod 600 "$file" 2>/dev/null || true
+}
+
 comai_expand_config_path() {
   local value="$1"
 
@@ -110,6 +117,7 @@ comai_set_config_value() {
 
   mkdir -p "$(dirname "$file")"
   [[ -f "$file" ]] || touch "$file"
+  comai_secure_config_file "$file"
 
   escaped_value="${value//\\/\\\\}"
   escaped_value="${escaped_value//&/\\&}"
@@ -119,6 +127,7 @@ comai_set_config_value() {
   else
     printf '%s: %s\n' "$key" "$value" >> "$file"
   fi
+  comai_secure_config_file "$file"
 }
 
 comai_legacy_provider_config_key() {
@@ -178,6 +187,7 @@ comai_set_provider_config_value() {
         }
       }
     ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    comai_secure_config_file "$file"
     if [[ -n "$legacy_key" ]] && grep -Eq "^[[:space:]]*${legacy_key}[[:space:]]*:" "$file"; then
       comai_set_config_value "$legacy_key" "$value" "$file"
     fi
@@ -188,12 +198,39 @@ comai_set_provider_config_value() {
   fi
 }
 
+comai_resolve_openai_api_key() {
+  local key_cmd="${1:-}"
+  local config_key="${2:-}"
+  local resolved=""
+
+  if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+    printf '%s\n' "$OPENAI_API_KEY"
+    return 0
+  fi
+
+  if [[ -n "${COMAI_OPENAI_API_KEY:-}" ]]; then
+    printf '%s\n' "$COMAI_OPENAI_API_KEY"
+    return 0
+  fi
+
+  if [[ -n "$key_cmd" ]]; then
+    resolved="$(sh -c "$key_cmd" 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$resolved" ]]; then
+      printf '%s\n' "$resolved"
+      return 0
+    fi
+  fi
+
+  printf '%s\n' "$config_key"
+}
+
 comai_load_config() {
   local config_file="${COMAI_CONFIG:-$COMAI_ROOT_DIR/config/comai.yaml}"
-  local provider ai_dir api_base_url api_base_port model local_api_base local_model gpt_model ollama_api_base ollama_model lmstudio_api_base lmstudio_model openai_api_base openai_api_key
+  local provider ai_dir api_base_url api_base_port model local_api_base local_model gpt_model ollama_api_base ollama_model lmstudio_api_base lmstudio_model openai_api_base openai_api_key openai_api_key_cmd
   local max_tokens timeout log_file file_max_bytes dir_context_max error_regex error_intent_regex
 
   COMAI_CONFIG_FILE="$config_file"
+  comai_secure_config_file "$config_file"
 
   provider="$(comai_yaml_value provider "$config_file" || true)"
   ai_dir="$(comai_yaml_value ai_dir "$config_file" || true)"
@@ -209,6 +246,7 @@ comai_load_config() {
   lmstudio_model="$(comai_yaml_value lmstudio_model "$config_file" || comai_yaml_provider_value lmstudio model "$config_file" || true)"
   openai_api_base="$(comai_yaml_value openai_api_base "$config_file" || comai_yaml_provider_value openai api_base "$config_file" || true)"
   openai_api_key="$(comai_yaml_value openai_api_key "$config_file" || comai_yaml_provider_value openai api_key "$config_file" || true)"
+  openai_api_key_cmd="$(comai_yaml_value openai_api_key_cmd "$config_file" || comai_yaml_provider_value openai api_key_cmd "$config_file" || true)"
   max_tokens="$(comai_yaml_value max_tokens "$config_file" || true)"
   timeout="$(comai_yaml_value timeout "$config_file" || true)"
   log_file="$(comai_yaml_value log_file "$config_file" || true)"
@@ -264,7 +302,8 @@ comai_load_config() {
         ;;
     esac
   fi
-  COMAI_OPENAI_API_KEY="${OPENAI_API_KEY:-${COMAI_OPENAI_API_KEY:-${openai_api_key}}}"
+  COMAI_OPENAI_API_KEY_CMD="${COMAI_OPENAI_API_KEY_CMD:-${openai_api_key_cmd}}"
+  COMAI_OPENAI_API_KEY="$(comai_resolve_openai_api_key "$COMAI_OPENAI_API_KEY_CMD" "$openai_api_key")"
   COMAI_MAX_TOKENS="${COMAI_MAX_TOKENS:-${max_tokens:-420}}"
   COMAI_TIMEOUT="${COMAI_TIMEOUT:-${timeout:-120}}"
   COMAI_LOG_FILE="${COMAI_LOG_FILE:-$(comai_expand_config_path "${log_file:-logs/comai.log}")}"
@@ -325,6 +364,7 @@ Config:
 
 Environment:
   OPENAI_API_KEY               Overrides openai_api_key for: comai gpt ...
+  COMAI_OPENAI_API_KEY_CMD     Command that prints an OpenAI API key, for example: pass show openai
   COMAI_PROVIDER=$COMAI_PROVIDER
   COMAI_MODEL=$COMAI_MODEL
   COMAI_API_BASE=$COMAI_API_BASE

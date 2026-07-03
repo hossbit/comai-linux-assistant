@@ -105,6 +105,35 @@ validate_systemd_path() {
   esac
 }
 
+install_dir_is_empty() {
+  local dir="$1"
+
+  [[ -d "$dir" ]] || return 0
+  [[ -z "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]
+}
+
+install_dir_has_comai_marker() {
+  local dir="$1"
+
+  [[ -f "$dir/.install-meta" ]] && grep -Fq "COMAI_INSTALL_VERSION=" "$dir/.install-meta" && return 0
+  [[ -f "$dir/.install-meta/comai" ]] && return 0
+  return 1
+}
+
+validate_install_dir_safety() {
+  local dir="$1"
+
+  case "$dir" in
+    /|"$HOME"|/bin|/sbin|/usr|/usr/bin|/usr/sbin|/usr/local|/usr/local/bin|/opt)
+      fail "refusing unsafe install directory: $dir"
+      ;;
+  esac
+
+  if [[ -d "$dir" ]] && ! install_dir_is_empty "$dir" && ! install_dir_has_comai_marker "$dir"; then
+    fail "refusing to update non-empty directory without a ComAI install marker: $dir"
+  fi
+}
+
 prompt_install_dir() {
   local answer default_display
 
@@ -112,6 +141,7 @@ prompt_install_dir() {
     INSTALL_DIR="$(expand_path "$INSTALL_DIR")"
     validate_absolute_path "install directory" "$INSTALL_DIR"
     validate_systemd_path "install directory" "$INSTALL_DIR"
+    validate_install_dir_safety "$INSTALL_DIR"
     printf 'Using ComAI install directory: %s\n' "$INSTALL_DIR"
     return
   fi
@@ -130,6 +160,7 @@ prompt_install_dir() {
   INSTALL_DIR="$(expand_path "${answer:-$DEFAULT_INSTALL_DIR}")"
   validate_absolute_path "install directory" "$INSTALL_DIR"
   validate_systemd_path "install directory" "$INSTALL_DIR"
+  validate_install_dir_safety "$INSTALL_DIR"
 }
 
 prompt_ai_dir() {
@@ -383,6 +414,7 @@ install_config() {
     printf 'Creating config: %s\n' "$target_config"
     cp "$source_config" "$target_config"
   fi
+  chmod 600 "$target_config" 2>/dev/null || true
 }
 
 set_config_value() {
@@ -399,6 +431,7 @@ set_config_value() {
   else
     printf '%s: %s\n' "$key" "$value" >> "$target_config"
   fi
+  chmod 600 "$target_config" 2>/dev/null || true
 }
 
 configure_local_ai_dir() {
