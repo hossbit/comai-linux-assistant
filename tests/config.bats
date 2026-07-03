@@ -110,6 +110,29 @@ EOF
   [ ! -e "$marker" ]
 }
 
+@test "OpenAI API key command failure is reported" {
+  config="$BATS_TEST_TMPDIR/comai.yaml"
+  cat > "$config" << 'EOF'
+provider: openai
+providers:
+  openai:
+    api_base: https://api.openai.com
+    model: test-model
+    api_key:
+    api_key_cmd: false
+EOF
+
+  COMAI_CONFIG="$config"
+  OPENAI_API_KEY=""
+  COMAI_OPENAI_API_KEY=""
+  comai_load_config
+
+  if comai_ensure_openai_api_key; then
+    return 1
+  fi
+  [ "$COMAI_OPENAI_API_KEY_STATUS" = "command_failed" ]
+}
+
 @test "config set api_key_cmd writes nested OpenAI provider key" {
   config="$BATS_TEST_TMPDIR/comai.yaml"
   cat > "$config" << 'EOF'

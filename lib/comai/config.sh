@@ -288,18 +288,42 @@ comai_resolve_openai_api_key() {
 }
 
 comai_ensure_openai_api_key() {
+  local resolved
+
+  COMAI_OPENAI_API_KEY_STATUS="missing"
   if [[ -n "${COMAI_OPENAI_API_KEY:-}" ]]; then
+    COMAI_OPENAI_API_KEY_STATUS="ok"
     return 0
   fi
 
   if [[ -n "${COMAI_OPENAI_API_KEY_CMD:-}" &&
     "${COMAI_PROVIDER:-}" != "openai" &&
     "${COMAI_ALLOW_OPENAI_KEY_CMD:-0}" != "1" ]]; then
+    COMAI_OPENAI_API_KEY_STATUS="deferred"
     return 1
   fi
 
-  COMAI_OPENAI_API_KEY="$(comai_resolve_openai_api_key "${COMAI_OPENAI_API_KEY_CMD:-}" "${COMAI_OPENAI_CONFIG_API_KEY:-}")"
-  [[ -n "${COMAI_OPENAI_API_KEY:-}" ]]
+  if [[ -n "${COMAI_OPENAI_API_KEY_CMD:-}" ]]; then
+    if ! comai_config_trusted_for_commands "$COMAI_CONFIG_FILE"; then
+      COMAI_OPENAI_API_KEY_STATUS="untrusted_config"
+      return 1
+    fi
+    resolved="$(sh -c "$COMAI_OPENAI_API_KEY_CMD" 2> /dev/null | head -n 1 || true)"
+    if [[ -n "$resolved" ]]; then
+      COMAI_OPENAI_API_KEY="$resolved"
+      COMAI_OPENAI_API_KEY_STATUS="ok"
+      return 0
+    fi
+    COMAI_OPENAI_API_KEY_STATUS="command_failed"
+  fi
+
+  if [[ -n "${COMAI_OPENAI_CONFIG_API_KEY:-}" ]]; then
+    COMAI_OPENAI_API_KEY="$COMAI_OPENAI_CONFIG_API_KEY"
+    COMAI_OPENAI_API_KEY_STATUS="ok"
+    return 0
+  fi
+
+  return 1
 }
 
 comai_curl_config_quote() {

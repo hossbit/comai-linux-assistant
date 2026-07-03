@@ -221,8 +221,20 @@ comai_ask_openai() {
   fi
 
   if ! comai_ensure_openai_api_key; then
-    comai_error "OpenAI API key is required for ChatGPT requests."
-    comai_error "Set openai_api_key in config/comai.yaml or export OPENAI_API_KEY."
+    case "${COMAI_OPENAI_API_KEY_STATUS:-missing}" in
+      command_failed)
+        comai_error "OpenAI api_key_cmd did not print an API key."
+        comai_error "Check api_key_cmd in: ${COMAI_CONFIG_FILE}"
+        ;;
+      untrusted_config)
+        comai_error "Refusing to run OpenAI api_key_cmd from an untrusted config file."
+        comai_error "Fix ownership and permissions on: ${COMAI_CONFIG_FILE}"
+        ;;
+      *)
+        comai_error "OpenAI API key is required for ChatGPT requests."
+        comai_error "Set openai_api_key in config/comai.yaml or export OPENAI_API_KEY."
+        ;;
+    esac
     return 1
   fi
 
