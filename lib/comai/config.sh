@@ -247,7 +247,7 @@ comai_load_config() {
   lmstudio_model="$(comai_yaml_value lmstudio_model "$config_file" || comai_yaml_provider_value lmstudio model "$config_file" || true)"
   openai_api_base="$(comai_yaml_value openai_api_base "$config_file" || comai_yaml_provider_value openai api_base "$config_file" || true)"
   openai_api_key="$(comai_yaml_value openai_api_key "$config_file" || comai_yaml_provider_value openai api_key "$config_file" || true)"
-  openai_api_key_cmd="$(comai_yaml_value openai_api_key_cmd "$config_file" || comai_yaml_provider_value openai api_key_cmd "$config_file" || true)"
+  openai_api_key_cmd="$(comai_yaml_value openai_api_key_cmd "$config_file" || comai_yaml_provider_value openai api_key_cmd "$config_file" || comai_yaml_value api_key_cmd "$config_file" || true)"
   max_tokens="$(comai_yaml_value max_tokens "$config_file" || true)"
   timeout="$(comai_yaml_value timeout "$config_file" || true)"
   log_file="$(comai_yaml_value log_file "$config_file" || true)"

@@ -64,6 +64,26 @@ EOF
   [ "$COMAI_OPENAI_API_KEY" = "env-key" ]
 }
 
+@test "load config accepts legacy top-level api_key_cmd fallback" {
+  config="$BATS_TEST_TMPDIR/comai.yaml"
+  cat > "$config" << 'EOF'
+provider: openai
+providers:
+  openai:
+    api_base: https://api.openai.com
+    model: test-model
+    api_key:
+api_key_cmd: printf fallback-key
+EOF
+
+  COMAI_CONFIG="$config"
+  OPENAI_API_KEY=""
+  COMAI_OPENAI_API_KEY=""
+  comai_load_config
+
+  [ "$COMAI_OPENAI_API_KEY" = "fallback-key" ]
+}
+
 @test "config set api_key_cmd writes nested OpenAI provider key" {
   config="$BATS_TEST_TMPDIR/comai.yaml"
   cat > "$config" << 'EOF'

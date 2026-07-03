@@ -457,6 +457,112 @@ merge_missing_config_defaults() {
   fi
 }
 
+normalize_openai_api_key_cmd_config() {
+  local target_config="$1"
+  local top_level_cmd nested_cmd
+
+  top_level_cmd="$(awk '
+    /^api_key_cmd[[:space:]]*:/ {
+      value = substr($0, index($0, ":") + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      print value
+      exit
+    }
+  ' "$target_config")"
+
+  nested_cmd="$(awk '
+    /^[^[:space:]#][^:]*:/ {
+      in_providers = ($0 ~ /^providers[[:space:]]*:/)
+      in_openai = 0
+    }
+    in_providers && $0 ~ /^  openai[[:space:]]*:/ {
+      in_openai = 1
+      next
+    }
+    in_openai && $0 ~ /^  [A-Za-z0-9_-]+[[:space:]]*:/ {
+      in_openai = 0
+    }
+    in_openai && $0 ~ /^    api_key_cmd[[:space:]]*:/ {
+      value = substr($0, index($0, ":") + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      print value
+      exit
+    }
+  ' "$target_config")"
+
+  [[ -n "$top_level_cmd" || -n "$nested_cmd" ]] || return 0
+
+  awk -v top_level_cmd="$top_level_cmd" '
+    BEGIN { in_providers = 0; in_openai = 0; wrote_cmd = 0 }
+    /^api_key_cmd[[:space:]]*:/ {
+      next
+    }
+    /^[^[:space:]#][^:]*:/ {
+      if (in_openai && !wrote_cmd) {
+        print "    # Optional command that prints the API key, for example: pass show openai"
+        print "    api_key_cmd: " top_level_cmd
+        wrote_cmd = 1
+      }
+      in_providers = ($0 ~ /^providers[[:space:]]*:/)
+      in_openai = 0
+    }
+    in_providers && $0 ~ /^  openai[[:space:]]*:/ {
+      in_openai = 1
+      wrote_cmd = 0
+      print
+      next
+    }
+    in_openai && $0 ~ /^    # Optional command that prints the API key/ {
+      if (wrote_cmd) {
+        next
+      }
+      pending_comment = $0
+      next
+    }
+    in_openai && $0 ~ /^    api_key_cmd[[:space:]]*:/ {
+      value = substr($0, index($0, ":") + 1)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      if (pending_comment != "") {
+        print pending_comment
+      } else {
+        print "    # Optional command that prints the API key, for example: pass show openai"
+      }
+      if (value == "" && top_level_cmd != "") {
+        print "    api_key_cmd: " top_level_cmd
+      } else {
+        print
+      }
+      pending_comment = ""
+      wrote_cmd = 1
+      next
+    }
+    in_openai && $0 ~ /^  [A-Za-z0-9_-]+[[:space:]]*:/ {
+      if (!wrote_cmd) {
+        print "    # Optional command that prints the API key, for example: pass show openai"
+        print "    api_key_cmd: " top_level_cmd
+        wrote_cmd = 1
+      }
+      in_openai = 0
+    }
+    {
+      if (pending_comment != "" && !wrote_cmd) {
+        print pending_comment
+        pending_comment = ""
+      }
+      print
+    }
+    END {
+      if (in_openai && !wrote_cmd) {
+        print "    # Optional command that prints the API key, for example: pass show openai"
+        print "    api_key_cmd: " top_level_cmd
+      }
+    }
+  ' "$target_config" > "${target_config}.tmp" && mv "${target_config}.tmp" "$target_config"
+}
+
 install_config() {
   local source_config="$ROOT_DIR/config/comai.yaml"
   local target_config="$INSTALL_DIR/config/comai.yaml"
@@ -474,6 +580,7 @@ install_config() {
     printf 'Backup saved: %s\n' "$backup_config"
     printf 'Default config saved: %s\n' "$default_copy"
     merge_missing_config_defaults "$source_config" "$target_config"
+    normalize_openai_api_key_cmd_config "$target_config"
   else
     printf 'Creating config: %s\n' "$target_config"
     cp "$source_config" "$target_config"
