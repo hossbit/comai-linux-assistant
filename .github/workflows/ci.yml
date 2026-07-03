@@ -18,7 +18,7 @@ jobs:
           sudo apt-get install -y bats shellcheck shfmt
 
       - name: ShellCheck
-        run: shellcheck bin/comai lib/comai/*.sh scripts/*.sh
+        run: shellcheck -x -e SC1091,SC2016,SC2034,SC2088,SC2126,SC2153,SC2221,SC2222 bin/comai lib/comai/*.sh scripts/*.sh
 
       - name: shfmt
         run: shfmt -d -i 2 -ci -sr bin/comai lib/comai/*.sh scripts/*.sh

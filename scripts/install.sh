@@ -542,7 +542,7 @@ fi
 
 section "App files"
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$SYSTEMD_USER_DIR"
-rm -rf "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/scripts"
+rm -rf "${INSTALL_DIR:?}/bin" "${INSTALL_DIR:?}/lib" "${INSTALL_DIR:?}/scripts"
 mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/scripts" "$INSTALL_DIR/logs"
 
 printf 'Installing executable files into: %s/bin\n' "$INSTALL_DIR"
