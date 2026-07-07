@@ -31,13 +31,7 @@ EOF
 }
 
 comai_clean_ai_output() {
-  comai_strip_terminal_controls | sed -E '
-    s/[[:space:]]+$//;
-    s/`{2,}/`/g;
-    s/[,،]{2,}/,/g;
-    s/[.]{2,}/./g;
-    s/[[:space:]]+([,.:;])/\1/g;
-  ' | awk '
+  LC_ALL=C awk '
     function norm_word(word) {
       word = tolower(word)
       gsub(/^[^[:alnum:]_]+|[^[:alnum:]_]+$/, "", word)
@@ -61,7 +55,17 @@ comai_clean_ai_output() {
       return out
     }
 
-    NF == 0 {
+    {
+      gsub(/[\001-\010\013\014\016-\037\177]/, "")
+      sub(/[[:space:]]+$/, "")
+      gsub(/`{2,}/, "`")
+      gsub(/[,،]{2,}/, ",")
+      gsub(/[.]{2,}/, ".")
+      while (match($0, /[[:space:]]+[,.:;]/)) {
+        $0 = substr($0, 1, RSTART - 1) substr($0, RSTART + RLENGTH - 1, 1) substr($0, RSTART + RLENGTH)
+      }
+    }
+    $0 == "" {
       if (!blank) {
         print
         blank = 1

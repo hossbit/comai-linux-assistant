@@ -156,14 +156,32 @@ Full documentation lives in the wiki:
 ## Requirements
 
 ```text
-bash curl jq find sort head sed awk grep wc tr readlink date systemctl
+Bash 4.2+ curl jq awk grep sed sort head wc tr readlink date
+GNU coreutils, including stat -c
+GNU findutils, including find -printf
 ```
 
 Optional:
 
 ```text
-file numfmt git
+file numfmt git systemctl shellcheck
 ```
+
+Standard Debian, Ubuntu, RHEL, Fedora, Rocky, AlmaLinux, and CentOS-style
+systems provide GNU coreutils/findutils, so `find -printf` and `stat -c` are
+expected to work there. Minimal BusyBox/toybox-based containers, Alpine images,
+and some UBI-minimal images may not provide those GNU extensions; install GNU
+findutils/coreutils or run ComAI from a fuller Debian/RHEL userland.
+
+For local portability checks, run:
+
+```bash
+scripts/test-local.sh
+```
+
+The test script uses the current `awk`, plus `mawk` and `gawk` when installed.
+To fully exercise the RHEL/Fedora awk path, run it on a host with `gawk`
+installed.
 
 ## Support
 

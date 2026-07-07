@@ -49,9 +49,8 @@ comai_first_matching_entry() {
 
 comai_answer_local_file_fact() {
   local request="$1"
-  local text kind="file" order="" label line _mtime size modified path
-
-  text="$(printf '%s' "$request" | tr '[:upper:]' '[:lower:]')"
+  local text="${2:-${request,,}}"
+  local kind="file" order="" label line _mtime size modified path
 
   if [[ "$text" == *directory* || "$text" == *directories* || "$text" == *folder* || "$text" == *folders* ]]; then
     kind="directory"
@@ -93,14 +92,16 @@ comai_answer_local_file_fact() {
 
 comai_answer_file_contains() {
   local request="$1"
-  local text needle file count
+  local text="${2:-${request,,}}"
+  local needle file count
 
   [[ "${#FILES[@]}" -gt 0 ]] || return 1
 
-  text="$(printf '%s' "$request" | tr '[:upper:]' '[:lower:]')"
   case "$text" in
     *see\ number\ * | *find\ number\ * | *has\ number\ * | *have\ number\ * | *contains\ number\ *)
-      needle="$(printf '%s' "$text" | sed -nE 's/.*(see|find|has|have|contains)[[:space:]]+number[[:space:]]+([0-9]+).*/\2/p' | head -n 1)"
+      if [[ "$text" =~ (see|find|has|have|contains)[[:space:]]+number[[:space:]]+([0-9]+) ]]; then
+        needle="${BASH_REMATCH[2]}"
+      fi
       ;;
     *see\ * | *find\ * | *contains\ *)
       needle=""
@@ -129,11 +130,11 @@ comai_answer_file_contains() {
 
 comai_answer_file_errors() {
   local request="$1"
-  local text file count
+  local text="${2:-${request,,}}"
+  local file count
 
   [[ "${#FILES[@]}" -gt 0 ]] || return 1
 
-  text="$(printf '%s' "$request" | tr '[:upper:]' '[:lower:]')"
   if ! printf '%s\n' "$text" | grep -Eq "$COMAI_ERROR_INTENT_RE"; then
     return 1
   fi
@@ -158,11 +159,11 @@ comai_answer_file_errors() {
 
 comai_answer_file_description() {
   local request="$1"
-  local text file size lines mime first_line description
+  local text="${2:-${request,,}}"
+  local file size lines mime first_line description
 
   [[ "${#FILES[@]}" -gt 0 ]] || return 1
 
-  text="$(printf '%s' "$request" | tr '[:upper:]' '[:lower:]')"
   if ! printf '%s\n' "$text" | grep -Eq 'what is (this|the) file|what file is this|what kind of file|file type|describe (this|the) file|tell me about (this|the) file'; then
     return 1
   fi

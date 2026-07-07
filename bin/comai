@@ -17,7 +17,7 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.3.14"
+COMAI_VERSION="2.3.15"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
@@ -62,7 +62,7 @@ comai_read_stdin_if_piped() {
 }
 
 comai_run_request() {
-  local text dir_context files prompt
+  local text text_lc dir_context files prompt
   local response
 
   comai_parse_args "$@" || return 1
@@ -72,25 +72,26 @@ comai_run_request() {
   if [[ -z "$text" ]]; then
     text="Answer using the provided file and directory context."
   fi
+  text_lc="${text,,}"
   comai_log info request_start "provider=$COMAI_PROVIDER model=$COMAI_MODEL chars=${#text} files=${#FILES[@]}"
 
   if [[ "$COMAI_PROVIDER" == "local" ]]; then
-    if comai_answer_local_file_fact "$text"; then
+    if comai_answer_local_file_fact "$text" "$text_lc"; then
       comai_log info local_answer "kind=file_fact chars=${#text}"
       return 0
     fi
 
-    if comai_answer_file_contains "$text"; then
+    if comai_answer_file_contains "$text" "$text_lc"; then
       comai_log info local_answer "kind=file_contains chars=${#text}"
       return 0
     fi
 
-    if comai_answer_file_errors "$text"; then
+    if comai_answer_file_errors "$text" "$text_lc"; then
       comai_log info local_answer "kind=file_errors chars=${#text}"
       return 0
     fi
 
-    if comai_answer_file_description "$text"; then
+    if comai_answer_file_description "$text" "$text_lc"; then
       comai_log info local_answer "kind=file_description chars=${#text}"
       return 0
     fi
@@ -105,7 +106,7 @@ comai_run_request() {
   fi
 
   dir_context=""
-  if comai_wants_directory_context "$text"; then
+  if comai_wants_directory_context "$text" "$text_lc"; then
     dir_context="$(comai_directory_context)"
   fi
 
@@ -302,6 +303,9 @@ comai_cmd_status_one() {
 
 comai_cmd_status() {
   local provider failed=0 active_failed=0
+  local providers=(local ollama lmstudio openai)
+  local tmp_dir i
+  local -a pids outputs statuses
 
   if ! comai_have curl || ! comai_have jq; then
     comai_error "curl and jq are required."
@@ -311,14 +315,33 @@ comai_cmd_status() {
   printf 'Config: %s\n' "$COMAI_CONFIG_FILE"
   if [[ "${1:-all}" == "all" ]]; then
     comai_log info provider_status_check "provider=all"
-    for provider in local ollama lmstudio openai; do
+    tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/comai-status.XXXXXX")" || return 1
+    for i in "${!providers[@]}"; do
+      provider="${providers[$i]}"
+      outputs[$i]="$tmp_dir/$provider.out"
+      (
+        COMAI_STATUS_EXPLICIT_PROVIDER="$provider"
+        comai_cmd_status_one "$provider"
+      ) > "${outputs[$i]}" 2>&1 &
+      pids[$i]=$!
+    done
+    for i in "${!providers[@]}"; do
+      if wait "${pids[$i]}"; then
+        statuses[$i]=0
+      else
+        statuses[$i]=$?
+      fi
+    done
+    for i in "${!providers[@]}"; do
+      provider="${providers[$i]}"
       printf '\n'
-      COMAI_STATUS_EXPLICIT_PROVIDER="$provider"
-      if ! comai_cmd_status_one "$provider"; then
+      cat "${outputs[$i]}"
+      if [[ "${statuses[$i]}" -ne 0 ]]; then
         failed=1
         [[ "$provider" == "$COMAI_PROVIDER" ]] && active_failed=1
       fi
     done
+    [[ -n "$tmp_dir" ]] && rm -rf "$tmp_dir"
   else
     case "$1" in
       local | ollama | lmstudio | openai)
@@ -379,25 +402,41 @@ comai_cmd_models() {
 comai_cmd_provider() {
   case "${1:-}" in
     "" | show | all)
-      local provider status suffix
+      local provider status suffix tmp_dir i
+      local providers=(local ollama lmstudio openai)
+      local -a pids
       printf 'active: %s\n' "$COMAI_PROVIDER"
-      for provider in local ollama lmstudio openai; do
+      tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/comai-provider.XXXXXX")" || return 1
+      for i in "${!providers[@]}"; do
+        provider="${providers[$i]}"
+        (
+          if comai_provider_status "$provider"; then
+            printf 'ok\n'
+          else
+            case "$provider:$?" in
+              openai:2) printf 'missing API key\n' ;;
+              openai:3) printf 'API key command returned no key\n' ;;
+              openai:4) printf 'API key command blocked by config permissions\n' ;;
+              *) printf 'unavailable\n' ;;
+            esac
+          fi
+        ) > "$tmp_dir/$provider.status" 2> /dev/null &
+        pids[$i]=$!
+      done
+      for i in "${!providers[@]}"; do
+        wait "${pids[$i]}" || true
+      done
+      for provider in "${providers[@]}"; do
         suffix=""
         [[ "$provider" == "$COMAI_PROVIDER" ]] && suffix=" (active)"
-        if comai_provider_status "$provider"; then
-          status="ok"
-        else
-          case "$provider:$?" in
-            openai:2) status="missing API key" ;;
-            *) status="unavailable" ;;
-          esac
-        fi
+        status="$(cat "$tmp_dir/$provider.status" 2> /dev/null || printf 'unavailable\n')"
         comai_log info provider_status "provider=$provider status=$status active=$([[ "$provider" == "$COMAI_PROVIDER" ]] && printf yes || printf no)"
         printf '\n%s%s\n' "$provider" "$suffix"
         printf '  api_base: %s\n' "$(comai_provider_api_base "$provider")"
         printf '  model: %s\n' "$(comai_provider_model "$provider")"
         printf '  status: %s\n' "$status"
       done
+      [[ -n "$tmp_dir" ]] && rm -rf "$tmp_dir"
       ;;
     list)
       printf 'local\nollama\nlmstudio\nopenai\n'
@@ -424,7 +463,7 @@ comai_cmd_provider() {
 comai_cmd_config() {
   case "${1:-show}" in
     show)
-      awk '
+      LC_ALL=C awk '
         /^[[:space:]]*openai_api_key[[:space:]]*:/ {
           value = substr($0, index($0, ":") + 1)
           gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
@@ -508,7 +547,7 @@ comai_install_meta_value() {
   local key="$1"
   local file="$2"
 
-  awk -v key="$key" '
+  LC_ALL=C awk -v key="$key" '
     $0 ~ "^[[:space:]]*" key "=" {
       value = substr($0, index($0, "=") + 1)
       sub(/^[[:space:]]+/, "", value)

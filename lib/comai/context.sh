@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+declare -A COMAI_FILES_SEEN 2> /dev/null || true
+
 comai_clean_path_token() {
   local token="$1"
   token="${token#\`}"
@@ -18,13 +20,11 @@ comai_clean_path_token() {
 
 comai_add_file_once() {
   local file="$1"
-  local existing
 
-  for existing in "${FILES[@]}"; do
-    [[ "$existing" == "$file" ]] && return 0
-  done
+  [[ -z "${COMAI_FILES_SEEN[$file]+set}" ]] || return 0
 
   FILES+=("$file")
+  COMAI_FILES_SEEN["$file"]=1
 }
 
 comai_detect_mentioned_files() {
@@ -46,8 +46,7 @@ comai_detect_mentioned_files() {
 }
 
 comai_wants_directory_context() {
-  local text
-  text="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  local text="${2:-${1,,}}"
 
   case "$text" in
     *here* | *current\ director* | *this\ director* | *this\ folder* | *project* | *repo* | *file* | *files* | *folder* | *directory* | *script* | *log*)

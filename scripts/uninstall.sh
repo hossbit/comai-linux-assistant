@@ -126,7 +126,7 @@ yaml_value() {
   local file="$2"
 
   [[ -f "$file" ]] || return 1
-  awk -v key="$key" '
+  LC_ALL=C awk -v key="$key" '
     {
       line = $0
       sub(/^[[:space:]]+/, "", line)
