@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-declare -A COMAI_FILES_SEEN 2> /dev/null || true
+declare -g -A COMAI_FILES_SEEN 2> /dev/null || declare -A COMAI_FILES_SEEN 2> /dev/null || true
 
 comai_clean_path_token() {
   local token="$1"
