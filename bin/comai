@@ -17,7 +17,7 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.3.17"
+COMAI_VERSION="2.3.18"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
@@ -320,7 +320,7 @@ comai_cmd_status() {
       provider="${providers[$i]}"
       outputs[i]="$tmp_dir/$provider.out"
       (
-        COMAI_STATUS_EXPLICIT_PROVIDER="$provider"
+        COMAI_STATUS_EXPLICIT_PROVIDER=""
         comai_cmd_status_one "$provider"
       ) > "${outputs[$i]}" 2>&1 &
       pids[i]=$!
@@ -378,7 +378,7 @@ comai_cmd_models() {
       if [[ "$provider" == "openai" && "$COMAI_PROVIDER" != "openai" ]]; then
         COMAI_ALLOW_OPENAI_KEY_CMD=0
       fi
-      if ! comai_provider_models "$provider" | sed 's/^/  /'; then
+      if ! comai_provider_models "$provider" 2> /dev/null | sed 's/^/  /'; then
         printf '  unavailable\n'
       fi
       printf '\n'
