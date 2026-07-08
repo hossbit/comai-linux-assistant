@@ -17,7 +17,7 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.3.20"
+COMAI_VERSION="2.3.21"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
@@ -370,7 +370,7 @@ comai_cmd_status() {
 }
 
 comai_cmd_models() {
-  local provider model_status
+  local provider model_status models_output
 
   if ! comai_have curl || ! comai_have jq; then
     comai_error "curl and jq are required."
@@ -380,25 +380,25 @@ comai_cmd_models() {
   if [[ "${1:-all}" == "all" ]]; then
     for provider in local ollama lmstudio openai; do
       printf '%s%s:\n' "$provider" "$([[ "$provider" == "$COMAI_PROVIDER" ]] && printf ' (active)')"
-      if [[ "$provider" == "openai" && "$COMAI_PROVIDER" != "openai" ]]; then
-        COMAI_ALLOW_OPENAI_KEY_CMD=0
+      if [[ "$provider" == "openai" ]]; then
+        COMAI_ALLOW_OPENAI_KEY_CMD=1
       fi
-      if ! comai_provider_models "$provider" 2> /dev/null | sed 's/^/  /'; then
+      models_output="$(mktemp "${TMPDIR:-/tmp}/comai-models.XXXXXX")" || return 1
+      if comai_provider_models "$provider" > "$models_output" 2> /dev/null; then
+        sed 's/^/  /' "$models_output"
+      else
         model_status="unavailable"
         if [[ "$provider" == "openai" ]]; then
-          if [[ -n "${COMAI_OPENAI_API_KEY_CMD:-}" && "$COMAI_PROVIDER" != "openai" ]]; then
-            model_status="api_key_cmd configured, not checked"
-          else
-            case "${COMAI_OPENAI_API_KEY_STATUS:-missing}" in
-              deferred) model_status="api_key_cmd configured, not checked" ;;
-              command_failed) model_status="API key command returned no key" ;;
-              untrusted_config) model_status="API key command blocked by config permissions" ;;
-              missing) model_status="missing API key" ;;
-            esac
-          fi
+          case "${COMAI_OPENAI_API_KEY_STATUS:-missing}" in
+            deferred) model_status="api_key_cmd configured, not checked" ;;
+            command_failed) model_status="API key command returned no key" ;;
+            untrusted_config) model_status="API key command blocked by config permissions" ;;
+            missing) model_status="missing API key" ;;
+          esac
         fi
         printf '  %s\n' "$model_status"
       fi
+      rm -f "$models_output"
       printf '\n'
     done
     return 0
@@ -428,6 +428,7 @@ comai_cmd_provider() {
       for i in "${!providers[@]}"; do
         provider="${providers[$i]}"
         (
+          [[ "$provider" == "openai" ]] && COMAI_ALLOW_OPENAI_KEY_CMD=1
           if comai_provider_status "$provider"; then
             printf 'ok\n'
           else
