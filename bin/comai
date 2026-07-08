@@ -17,7 +17,7 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.3.19"
+COMAI_VERSION="2.3.20"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
@@ -370,7 +370,7 @@ comai_cmd_status() {
 }
 
 comai_cmd_models() {
-  local provider
+  local provider model_status
 
   if ! comai_have curl || ! comai_have jq; then
     comai_error "curl and jq are required."
@@ -384,7 +384,20 @@ comai_cmd_models() {
         COMAI_ALLOW_OPENAI_KEY_CMD=0
       fi
       if ! comai_provider_models "$provider" 2> /dev/null | sed 's/^/  /'; then
-        printf '  unavailable\n'
+        model_status="unavailable"
+        if [[ "$provider" == "openai" ]]; then
+          if [[ -n "${COMAI_OPENAI_API_KEY_CMD:-}" && "$COMAI_PROVIDER" != "openai" ]]; then
+            model_status="api_key_cmd configured, not checked"
+          else
+            case "${COMAI_OPENAI_API_KEY_STATUS:-missing}" in
+              deferred) model_status="api_key_cmd configured, not checked" ;;
+              command_failed) model_status="API key command returned no key" ;;
+              untrusted_config) model_status="API key command blocked by config permissions" ;;
+              missing) model_status="missing API key" ;;
+            esac
+          fi
+        fi
+        printf '  %s\n' "$model_status"
       fi
       printf '\n'
     done
