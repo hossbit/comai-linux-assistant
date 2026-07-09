@@ -4,16 +4,13 @@ comai_cmd_setup() {
   local provider api model key answer
 
   printf 'ComAI setup\n'
-  printf 'Provider [local/ollama/lmstudio/openai] (%s): ' "$COMAI_PROVIDER"
+  printf 'Provider [%s] (%s): ' "$(comai_provider_usage_list | tr '|' '/')" "$COMAI_PROVIDER"
   read -r provider
   provider="${provider:-$COMAI_PROVIDER}"
-  case "$provider" in
-    local | ollama | lmstudio | openai) ;;
-    *)
-      comai_error "provider must be local, ollama, lmstudio, or openai"
-      return 1
-      ;;
-  esac
+  if ! comai_provider_exists "$provider"; then
+    comai_error "provider must be one of: $(comai_provider_usage_list)"
+    return 1
+  fi
 
   comai_set_config_value provider "$provider"
 
@@ -54,6 +51,22 @@ comai_cmd_setup() {
         read -r key
         if [[ -n "$key" ]]; then
           comai_set_provider_config_value openai api_key "$key"
+          comai_secure_config_file "$COMAI_CONFIG_FILE"
+        fi
+      fi
+      ;;
+    gemini)
+      printf 'Gemini API base (%s): ' "$COMAI_GEMINI_API_BASE"
+      read -r api
+      printf 'Gemini model (%s): ' "$COMAI_GEMINI_MODEL"
+      read -r model
+      comai_set_provider_config_value gemini api_base "${api:-$COMAI_GEMINI_API_BASE}"
+      comai_set_provider_config_value gemini model "${model:-$COMAI_GEMINI_MODEL}"
+      if [[ -z "${COMAI_GEMINI_API_KEY:-}" ]]; then
+        printf 'Gemini API key (leave blank to use GEMINI_API_KEY later): '
+        read -r key
+        if [[ -n "$key" ]]; then
+          comai_set_provider_config_value gemini api_key "$key"
           comai_secure_config_file "$COMAI_CONFIG_FILE"
         fi
       fi

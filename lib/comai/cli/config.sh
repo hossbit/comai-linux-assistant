@@ -1,6 +1,8 @@
 # shellcheck shell=bash disable=SC2154
 
 comai_cmd_config() {
+  local provider_key provider_name setting_name
+
   case "${1:-show}" in
     show)
       LC_ALL=C awk '
@@ -14,6 +16,18 @@ comai_cmd_config() {
           }
           next
         }
+        /^[[:space:]]*(openai_api_key_cmd|gemini_api_key_cmd)[[:space:]]*:/ {
+          key = $0
+          sub(/[[:space:]]*:.*/, "", key)
+          value = substr($0, index($0, ":") + 1)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+          if (value == "") {
+            print key ":"
+          } else {
+            print key ": [set]"
+          }
+          next
+        }
         /^[[:space:]]*api_key[[:space:]]*:/ {
           value = substr($0, index($0, ":") + 1)
           gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
@@ -21,6 +35,16 @@ comai_cmd_config() {
             print "    api_key:"
           } else {
             print "    api_key: [set]"
+          }
+          next
+        }
+        /^[[:space:]]*api_key_cmd[[:space:]]*:/ {
+          value = substr($0, index($0, ":") + 1)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+          if (value == "") {
+            print "    api_key_cmd:"
+          } else {
+            print "    api_key_cmd: [set]"
           }
           next
         }
@@ -35,9 +59,33 @@ comai_cmd_config() {
         comai_error "usage: comai config get KEY"
         return 1
       fi
-      if [[ "$2" == "openai_api_key" ]]; then
+      if [[ "$2" == "openai_api_key" || "$2" == "openai_api_key_cmd" ]]; then
         if [[ -n "$(comai_yaml_value "$2" "$COMAI_CONFIG_FILE" || true)" ]]; then
           printf '[set]\n'
+        fi
+      elif [[ "$2" == "gemini_api_key" || "$2" == "gemini_api_key_cmd" ]]; then
+        if [[ -n "$(comai_yaml_value "$2" "$COMAI_CONFIG_FILE" || true)" ]]; then
+          printf '[set]\n'
+        fi
+      elif [[ "$2" =~ ^providers\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$ ]]; then
+        provider_name="${BASH_REMATCH[1]}"
+        setting_name="${BASH_REMATCH[2]}"
+        if [[ "$setting_name" == "api_key" || "$setting_name" == "api_key_cmd" ]]; then
+          if [[ -n "$(comai_yaml_provider_value "$provider_name" "$setting_name" "$COMAI_CONFIG_FILE" || true)" ]]; then
+            printf '[set]\n'
+          fi
+        else
+          comai_yaml_provider_value "$provider_name" "$setting_name" "$COMAI_CONFIG_FILE"
+        fi
+      elif [[ "$2" =~ ^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$ ]]; then
+        provider_name="${BASH_REMATCH[1]}"
+        setting_name="${BASH_REMATCH[2]}"
+        if [[ "$setting_name" == "api_key" || "$setting_name" == "api_key_cmd" ]]; then
+          if [[ -n "$(comai_yaml_provider_value "$provider_name" "$setting_name" "$COMAI_CONFIG_FILE" || true)" ]]; then
+            printf '[set]\n'
+          fi
+        else
+          comai_yaml_provider_value "$provider_name" "$setting_name" "$COMAI_CONFIG_FILE"
         fi
       else
         comai_yaml_value "$2" "$COMAI_CONFIG_FILE"
@@ -58,8 +106,21 @@ comai_cmd_config() {
         openai_api_key | openai.api_key | providers.openai.api_key)
           comai_set_provider_config_value openai api_key "$3"
           ;;
+        gemini_api_key_cmd | gemini.api_key_cmd | providers.gemini.api_key_cmd)
+          comai_set_provider_config_value gemini api_key_cmd "$3"
+          ;;
+        gemini_api_key | gemini.api_key | providers.gemini.api_key)
+          comai_set_provider_config_value gemini api_key "$3"
+          ;;
         *)
-          comai_set_config_value "$2" "$3"
+          provider_key="$2"
+          if [[ "$provider_key" =~ ^providers\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$ ]]; then
+            comai_set_provider_config_value "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "$3"
+          elif [[ "$provider_key" =~ ^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$ ]]; then
+            comai_set_provider_config_value "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "$3"
+          else
+            comai_set_config_value "$2" "$3"
+          fi
           ;;
       esac
       printf 'Set %s in %s\n' "$2" "$COMAI_CONFIG_FILE"

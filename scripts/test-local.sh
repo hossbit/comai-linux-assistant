@@ -41,9 +41,23 @@ run_with_awk() {
   PATH="$tmp_dir:$PATH" bash -n \
     "$ROOT_DIR/bin/comai" \
     "$ROOT_DIR/lib/comai/config.sh" \
+    "$ROOT_DIR/lib/comai/config/yaml.sh" \
+    "$ROOT_DIR/lib/comai/config/files.sh" \
+    "$ROOT_DIR/lib/comai/config/write.sh" \
+    "$ROOT_DIR/lib/comai/config/keys.sh" \
+    "$ROOT_DIR/lib/comai/config/load.sh" \
+    "$ROOT_DIR/lib/comai/args.sh" \
+    "$ROOT_DIR/lib/comai/providers/registry.sh" \
+    "$ROOT_DIR/lib/comai/providers/openai-compatible.sh" \
+    "$ROOT_DIR/lib/comai/providers/local.sh" \
+    "$ROOT_DIR/lib/comai/providers/ollama.sh" \
+    "$ROOT_DIR/lib/comai/providers/lmstudio.sh" \
+    "$ROOT_DIR/lib/comai/providers/openai.sh" \
+    "$ROOT_DIR/lib/comai/providers/gemini.sh" \
     "$ROOT_DIR/lib/comai/context.sh" \
     "$ROOT_DIR/lib/comai/local-checks.sh" \
     "$ROOT_DIR/lib/comai/ai.sh" \
+    "$ROOT_DIR/tests/core.sh" \
     "$ROOT_DIR/scripts/uninstall.sh"
 
   output="$(
@@ -55,7 +69,8 @@ run_with_awk() {
     ' bash "$ROOT_DIR"
   )"
   assert_contains "$output" $'provider\tlocal'
-  assert_contains "$output" $'provider_openai_model\tgpt-5.5'
+  assert_contains "$output" $'provider_openai_model\tgpt-4o-mini'
+  assert_contains "$output" $'provider_gemini_model\tgemini-2.5-flash'
 
   output="$(
     PATH="$tmp_dir:$PATH" bash -c '
@@ -72,8 +87,61 @@ run_with_awk() {
   output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" config get provider)"
   [[ "$output" == "local" ]]
 
+  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" provider list)"
+  assert_contains "$output" 'gemini'
+
+  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" status 2>&1 || true)"
+  assert_contains "$output" 'Provider: local (active)'
+  assert_contains "$output" 'Provider: gemini'
+
+  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" --provider gemini hi 2>&1 || true)"
+  assert_contains "$output" 'Gemini API key is required.'
+
+  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" --max-tokens=abc hi 2>&1 || true)"
+  assert_contains "$output" '--max-tokens must be a positive integer.'
+
+  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" --max-tokens -5 hi 2>&1 || true)"
+  assert_contains "$output" '--max-tokens must be a positive integer.'
+
+  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" -- ollama is first word 2>&1 || true)"
+  assert_contains "$output" 'Local provider API is not responding'
+
   output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" newest file)"
   assert_contains "$output" 'The newest file'
+
+  printf 'line one\nnumber 4242\n' > "$tmp_dir/my file.txt"
+  output="$(
+    PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 bash -c '
+      cd "$1"
+      "$2/bin/comai" does my file.txt contain number 4242
+    ' bash "$tmp_dir" "$ROOT_DIR"
+  )"
+  assert_contains "$output" 'Yes. `4242` appears in my file.txt'
+
+  output="$(
+    PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 bash -c '
+      cd "$1"
+      printf "ok\nERROR bad\n" | "$2/bin/comai" analyze
+    ' bash "$tmp_dir" "$ROOT_DIR"
+  )"
+  assert_contains "$output" 'Found 1 possible issue line'
+
+  output="$(
+    PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 bash -c '
+      set -euo pipefail
+      cfg="$1/comai.yaml"
+      cp "$2/config/comai.yaml" "$cfg"
+      . "$2/lib/comai/config.sh"
+      COMAI_ROOT_DIR="$2"
+      COMAI_CONFIG="$cfg"
+      comai_load_config
+      . "$2/lib/comai/providers/registry.sh"
+      . "$2/lib/comai/cli/config.sh"
+      comai_set_provider_config_value openai api_key_cmd "pass show openai"
+      comai_cmd_config show
+    ' bash "$tmp_dir" "$ROOT_DIR"
+  )"
+  assert_contains "$output" 'api_key_cmd: [set]'
 
   rm -rf "$tmp_dir"
   trap - RETURN
@@ -104,14 +172,29 @@ main() {
   if command -v shellcheck > /dev/null 2>&1; then
     shellcheck \
       "$ROOT_DIR/bin/comai" \
+      "$ROOT_DIR/lib/comai/config/yaml.sh" \
+      "$ROOT_DIR/lib/comai/config/files.sh" \
+      "$ROOT_DIR/lib/comai/config/write.sh" \
+      "$ROOT_DIR/lib/comai/config/keys.sh" \
+      "$ROOT_DIR/lib/comai/config/load.sh" \
+      "$ROOT_DIR/lib/comai/providers/registry.sh" \
+      "$ROOT_DIR/lib/comai/providers/openai-compatible.sh" \
+      "$ROOT_DIR/lib/comai/providers/local.sh" \
+      "$ROOT_DIR/lib/comai/providers/ollama.sh" \
+      "$ROOT_DIR/lib/comai/providers/lmstudio.sh" \
+      "$ROOT_DIR/lib/comai/providers/openai.sh" \
+      "$ROOT_DIR/lib/comai/providers/gemini.sh" \
       "$ROOT_DIR/lib/comai/config.sh" \
       "$ROOT_DIR/lib/comai/context.sh" \
       "$ROOT_DIR/lib/comai/local-checks.sh" \
       "$ROOT_DIR/lib/comai/ai.sh" \
+      "$ROOT_DIR/tests/core.sh" \
       "$ROOT_DIR/scripts/uninstall.sh"
   else
     printf 'shellcheck: skipped (not installed)\n'
   fi
+
+  "$ROOT_DIR/tests/core.sh"
 
   printf 'ok\n'
 }

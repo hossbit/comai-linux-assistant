@@ -6,18 +6,37 @@ COMAI_ROOT_DIR="$(cd "$(dirname "$COMAI_BIN_PATH")/.." && pwd)"
 
 # shellcheck source=../lib/comai/config.sh
 . "$COMAI_ROOT_DIR/lib/comai/config.sh"
+
+comai_source_provider_module() {
+  local module="$1"
+  local path="$COMAI_ROOT_DIR/lib/comai/providers/$module.sh"
+
+  if [[ ! -f "$path" ]]; then
+    printf 'comai: missing provider module: %s\n' "$path" >&2
+    return 1
+  fi
+  # shellcheck source=/dev/null
+  . "$path"
+}
+
+comai_source_provider_module registry
+comai_source_provider_module openai-compatible
+comai_source_provider_module local
+comai_source_provider_module ollama
+comai_source_provider_module lmstudio
+comai_source_provider_module openai
+comai_source_provider_module gemini
+
 # shellcheck source=../lib/comai/args.sh
 . "$COMAI_ROOT_DIR/lib/comai/args.sh"
 # shellcheck source=../lib/comai/context.sh
 . "$COMAI_ROOT_DIR/lib/comai/context.sh"
 # shellcheck source=../lib/comai/local-checks.sh
 . "$COMAI_ROOT_DIR/lib/comai/local-checks.sh"
-# shellcheck source=../lib/comai/model-conditions.sh
-. "$COMAI_ROOT_DIR/lib/comai/model-conditions.sh"
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.4.0"
+COMAI_VERSION="2.5.0"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
@@ -29,8 +48,7 @@ comai_source_cli_module() {
   local path="$COMAI_ROOT_DIR/lib/comai/cli/$module.sh"
 
   if [[ ! -f "$path" ]]; then
-    printf 'comai: missing CLI module: %s
-' "$path" >&2
+    printf 'comai: missing CLI module: %s\n' "$path" >&2
     return 1
   fi
   # shellcheck source=/dev/null

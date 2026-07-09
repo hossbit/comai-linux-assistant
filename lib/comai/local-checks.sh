@@ -94,16 +94,17 @@ comai_answer_file_contains() {
   local request="$1"
   local text="${2:-${request,,}}"
   local needle file count
+  needle=""
 
   [[ "${#FILES[@]}" -gt 0 ]] || return 1
 
   case "$text" in
-    *see\ number\ * | *find\ number\ * | *has\ number\ * | *have\ number\ * | *contains\ number\ *)
-      if [[ "$text" =~ (see|find|has|have|contains)[[:space:]]+number[[:space:]]+([0-9]+) ]]; then
+    *number\ *)
+      if [[ "$text" =~ (see|find|has|have|contain|contains).*[[:space:]]number[[:space:]]+([0-9]+) ]]; then
         needle="${BASH_REMATCH[2]}"
       fi
       ;;
-    *see\ * | *find\ * | *contains\ *)
+    *see\ * | *find\ * | *contain\ * | *contains\ *)
       needle=""
       ;;
     *)

@@ -16,6 +16,7 @@ PATH_NOTE=""
 SERVICE_NOTE=""
 SERVICE_INSTALLED=0
 COMAI_VERSION=""
+CONFIG_BACKUP_KEEP="${COMAI_CONFIG_BACKUP_KEEP:-5}"
 INSTALL_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 INSTALL_SOURCE_REF="${COMAI_REF:-main}"
 INSTALL_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
@@ -375,6 +376,22 @@ secure_temp_for() {
   printf '%s\n' "$tmp"
 }
 
+rotate_config_backups() {
+  local target_config="$1"
+  local keep="${2:-$CONFIG_BACKUP_KEEP}"
+  local dir base backup count=0
+
+  [[ "$keep" =~ ^[0-9]+$ ]] || keep=5
+  dir="$(dirname "$target_config")"
+  base="$(basename "$target_config")"
+  while IFS= read -r backup; do
+    count=$((count + 1))
+    if [[ "$count" -gt "$keep" ]]; then
+      rm -f "$backup"
+    fi
+  done < <(find "$dir" -maxdepth 1 -type f -name "${base}.backup.*" -printf '%T@ %p\n' 2> /dev/null | sort -nr | awk '{ $1=""; sub(/^ /, ""); print }')
+}
+
 merge_missing_config_defaults() {
   local source_config="$1"
   local target_config="$2"
@@ -396,6 +413,48 @@ merge_missing_config_defaults() {
       ' "$source_config"
     } >> "$target_config"
     added+=("providers")
+  fi
+
+  if ! grep -Eq "^[[:space:]]{2}gemini[[:space:]]*:" "$target_config"; then
+    block="$(
+      awk '
+        /^  gemini[[:space:]]*:/ {
+          copy = 1
+        }
+        copy && /^[^[:space:]#][^:]*:/ {
+          exit
+        }
+        copy && /^  [A-Za-z0-9_-]+[[:space:]]*:/ && $0 !~ /^  gemini[[:space:]]*:/ {
+          exit
+        }
+        copy {
+          print
+        }
+      ' "$source_config"
+    )"
+    if [[ -n "$block" ]]; then
+      tmp="$(secure_temp_for "$target_config")"
+      awk -v block="$block" '
+        BEGIN { in_providers = 0; added = 0 }
+        /^[^[:space:]#][^:]*:/ {
+          if (in_providers && !added) {
+            print block
+            added = 1
+          }
+          in_providers = ($0 ~ /^providers[[:space:]]*:/)
+        }
+        { print }
+        END {
+          if (in_providers && !added) {
+            print block
+          }
+        }
+      ' "$target_config" > "$tmp" && mv "$tmp" "$target_config"
+      if [[ -e "${tmp:-}" ]]; then
+        rm -f "$tmp"
+      fi
+      added+=("providers.gemini")
+    fi
   fi
 
   block=""
@@ -613,17 +672,21 @@ install_config() {
   local backup_config
 
   mkdir -p "$INSTALL_DIR/config"
+  chmod 700 "$INSTALL_DIR/config" 2> /dev/null || true
 
   if [[ -f "$target_config" ]]; then
     backup_config="$target_config.backup.$(date +%Y%m%d%H%M%S)"
     printf 'Existing config found: %s\n' "$target_config"
     printf 'Keeping your values and adding any missing release defaults.\n'
     cp "$target_config" "$backup_config"
+    chmod 600 "$backup_config" 2> /dev/null || true
     cp "$source_config" "$default_copy"
+    chmod 600 "$default_copy" 2> /dev/null || true
     printf 'Backup saved: %s\n' "$backup_config"
     printf 'Default config saved: %s\n' "$default_copy"
     merge_missing_config_defaults "$source_config" "$target_config"
     normalize_openai_api_key_cmd_config "$target_config"
+    rotate_config_backups "$target_config"
   else
     printf 'Creating config: %s\n' "$target_config"
     cp "$source_config" "$target_config"
@@ -635,15 +698,22 @@ set_config_value() {
   local key="$1"
   local value="$2"
   local target_config="$INSTALL_DIR/config/comai.yaml"
-  local escaped_value
+  local tmp
 
   validate_config_key "$key"
   validate_config_value "$value"
-  escaped_value="${value//\\/\\\\}"
-  escaped_value="${escaped_value//&/\\&}"
-  escaped_value="${escaped_value//|/\\|}"
   if grep -Eq "^[[:space:]]*${key}[[:space:]]*:" "$target_config"; then
-    sed -i "s|^[[:space:]]*${key}[[:space:]]*:.*|${key}: ${escaped_value}|" "$target_config"
+    tmp="$(secure_temp_for "$target_config")"
+    awk -v key="$key" -v value="$value" '
+      $0 ~ "^[[:space:]]*" key "[[:space:]]*:" {
+        print key ": " value
+        next
+      }
+      { print }
+    ' "$target_config" > "$tmp" && mv "$tmp" "$target_config"
+    if [[ -e "${tmp:-}" ]]; then
+      rm -f "$tmp"
+    fi
   else
     printf '%s: %s\n' "$key" "$value" >> "$target_config"
   fi
@@ -758,8 +828,11 @@ fi
 
 section "App files"
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$SYSTEMD_USER_DIR"
+chmod 755 "$INSTALL_DIR" 2> /dev/null || true
 rm -rf "${INSTALL_DIR:?}/bin" "${INSTALL_DIR:?}/lib" "${INSTALL_DIR:?}/scripts"
 mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/scripts" "$INSTALL_DIR/logs"
+chmod 755 "$INSTALL_DIR/bin" "$INSTALL_DIR/lib" "$INSTALL_DIR/scripts" 2> /dev/null || true
+chmod 700 "$INSTALL_DIR/logs" 2> /dev/null || true
 
 printf 'Installing executable files into: %s/bin\n' "$INSTALL_DIR"
 cp -R "$ROOT_DIR/bin/." "$INSTALL_DIR/bin/"

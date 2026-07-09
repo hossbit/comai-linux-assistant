@@ -1,13 +1,28 @@
 #!/usr/bin/env bash
 
+comai_validate_max_tokens() {
+  local value="$1"
+
+  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+    comai_error "--max-tokens must be a positive integer."
+    return 1
+  fi
+}
+
 comai_parse_args() {
-  local arg next_is_file=0 next_is_model=0 next_is_api_base=0 next_is_max_tokens=0 next_is_command=0
+  local arg provider_flag next_is_file=0 next_is_model=0 next_is_api_base=0 next_is_provider=0 next_is_max_tokens=0 next_is_command=0 literal_args=0
 
   REQUEST_ARGS=()
   FILES=()
 
   while [[ "$#" -gt 0 ]]; do
     arg="$1"
+
+    if [[ "$literal_args" -eq 1 ]]; then
+      REQUEST_ARGS+=("$arg")
+      shift
+      continue
+    fi
 
     if [[ "$next_is_file" -eq 1 ]]; then
       FILES+=("$arg")
@@ -31,7 +46,18 @@ comai_parse_args() {
       continue
     fi
 
+    if [[ "$next_is_provider" -eq 1 ]]; then
+      if ! comai_provider_select "$arg"; then
+        comai_error "unknown provider: $arg"
+        return 1
+      fi
+      next_is_provider=0
+      shift
+      continue
+    fi
+
     if [[ "$next_is_max_tokens" -eq 1 ]]; then
+      comai_validate_max_tokens "$arg" || return 1
       COMAI_MAX_TOKENS="$arg"
       next_is_max_tokens=0
       shift
@@ -48,43 +74,23 @@ comai_parse_args() {
     case "$arg" in
       gpt | chatgpt)
         if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
-          comai_select_openai_provider
+          comai_provider_select openai
         else
           REQUEST_ARGS+=("$arg")
         fi
         ;;
       --gpt | --chatgpt)
-        comai_select_openai_provider
+        comai_provider_select openai
         ;;
-      ollama)
-        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
-          comai_select_ollama_provider
-        else
-          REQUEST_ARGS+=("$arg")
+      --provider=*)
+        provider_flag="${arg#--provider=}"
+        if ! comai_provider_select "$provider_flag"; then
+          comai_error "unknown provider: $provider_flag"
+          return 1
         fi
         ;;
-      lmstudio | lm-studio)
-        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
-          comai_select_lmstudio_provider
-        else
-          REQUEST_ARGS+=("$arg")
-        fi
-        ;;
-      local)
-        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
-          comai_select_local_provider
-        else
-          REQUEST_ARGS+=("$arg")
-        fi
-        ;;
-      --ollama)
-        comai_select_ollama_provider
-        ;;
-      --lmstudio | --lm-studio)
-        comai_select_lmstudio_provider
-        ;;
-      --local)
-        comai_select_local_provider
+      --provider)
+        next_is_provider=1
         ;;
       --model=*)
         COMAI_MODEL="${arg#--model=}"
@@ -100,10 +106,14 @@ comai_parse_args() {
         next_is_api_base=1
         ;;
       --max-tokens=*)
+        comai_validate_max_tokens "${arg#--max-tokens=}" || return 1
         COMAI_MAX_TOKENS="${arg#--max-tokens=}"
         ;;
       --max-tokens)
         next_is_max_tokens=1
+        ;;
+      --)
+        literal_args=1
         ;;
       --file=* | --files=* | -f=*)
         FILES+=("${arg#*=}")
@@ -120,8 +130,26 @@ comai_parse_args() {
       --local=*)
         REQUEST_ARGS+=("${arg#--local=}")
         ;;
+      --*)
+        provider_flag="${arg#--}"
+        provider_flag="${provider_flag//-/_}"
+        if [[ "$provider_flag" == "lm_studio" ]]; then
+          provider_flag="lmstudio"
+        fi
+        if comai_provider_exists "$provider_flag"; then
+          comai_provider_select "$provider_flag"
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
+        ;;
       *)
-        REQUEST_ARGS+=("$arg")
+        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]] && comai_provider_exists "$arg"; then
+          comai_provider_select "$arg"
+        elif [[ "${#REQUEST_ARGS[@]}" -eq 0 && "$arg" == "lm-studio" ]]; then
+          comai_provider_select lmstudio
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
         ;;
     esac
     shift
@@ -137,6 +165,10 @@ comai_parse_args() {
   fi
   if [[ "$next_is_api_base" -eq 1 ]]; then
     comai_error "missing URL after --api-base"
+    return 1
+  fi
+  if [[ "$next_is_provider" -eq 1 ]]; then
+    comai_error "missing provider after --provider"
     return 1
   fi
   if [[ "$next_is_max_tokens" -eq 1 ]]; then

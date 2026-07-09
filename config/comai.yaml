@@ -1,4 +1,4 @@
-# Default provider. Use "local", "ollama", "lmstudio", or "openai".
+# Default provider. Use "local", "ollama", "lmstudio", "openai", or "gemini".
 provider: local
 
 # Optional LocalAI helper directory. This is only used by the start/stop helper service.
@@ -25,14 +25,23 @@ providers:
   # OpenAI API base URL without a trailing /v1 path.
   openai:
     api_base: https://api.openai.com
-    model: gpt-5.5
+    model: gpt-4o-mini
     # Optional OpenAI API key. Prefer OPENAI_API_KEY in your shell for better safety.
     api_key:
     # Optional command that prints the API key, for example: pass show openai
     api_key_cmd:
 
+  # Gemini API base URL without a trailing /v1beta path.
+  gemini:
+    api_base: https://generativelanguage.googleapis.com
+    model: gemini-2.5-flash
+    # Optional Gemini API key. Prefer GEMINI_API_KEY in your shell for better safety.
+    api_key:
+    # Optional command that prints the API key, for example: pass show gemini
+    api_key_cmd:
+
 # Maximum tokens requested from the model.
-max_tokens: 420
+max_tokens: 900
 
 # HTTP request timeout in seconds.
 timeout: 120

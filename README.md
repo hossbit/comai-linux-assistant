@@ -12,6 +12,7 @@
 ![Ollama](https://img.shields.io/badge/Ollama-supported-black)
 ![LM Studio](https://img.shields.io/badge/LM%20Studio-supported-1F6FEB)
 ![OpenAI](https://img.shields.io/badge/OpenAI-supported-10A37F)
+![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Wiki](https://img.shields.io/badge/Wiki-documentation-blueviolet)](https://github.com/hossbit/comai-linux-assistant-wiki)
 
@@ -20,13 +21,13 @@
 **ComAI** is a Bash-powered AI assistant for your Linux terminal.
 
 Use it to ask Linux questions, explain commands before you run them, inspect
-files, scan logs, and talk to local AI, Ollama, or OpenAI without leaving your
+files, scan logs, and talk to local AI, Ollama, OpenAI, or Gemini without leaving your
 shell. ComAI is the client; LocalAI is only one optional backend.
 
 ## Why Use It
 
 - Works from any terminal with the simple `comai` command.
-- Supports LocalAI, Ollama, LM Studio, llama.cpp server, OpenAI, and other OpenAI-compatible APIs.
+- Supports LocalAI, Ollama, LM Studio, llama.cpp server, OpenAI, Gemini, and other OpenAI-compatible APIs.
 - Understands files and logs with `-f`.
 - Keeps setup and provider checks visible with `comai status`.
 - Installs as a user-space tool under `~/localcomai`.
@@ -75,10 +76,18 @@ comai do you see any error? -f application.log
 comai ollama hi
 comai lmstudio hi
 comai gpt hi
+comai gemini hi
 ```
 
 Local mode is the default. Use `comai ollama ...` for Ollama,
-`comai lmstudio ...` for LM Studio, and `comai gpt ...` for OpenAI.
+`comai lmstudio ...` for LM Studio, `comai gpt ...` for OpenAI, and
+`comai gemini ...` for Gemini.
+
+Use `--` when the first word of your question is also a provider name:
+
+```bash
+comai -- ollama is the first word of this question
+```
 
 ## Main Commands
 
@@ -98,6 +107,15 @@ comai stop        # Stop the optional LocalAI helper service
 comai restart     # Restart the optional LocalAI helper service
 ```
 
+Common options:
+
+```bash
+comai --provider gemini --model gemini-2.5-flash hi
+comai --max-tokens 900 "summarize this"
+```
+
+`--max-tokens` must be a positive integer.
+
 ## Providers
 
 ComAI supports:
@@ -106,6 +124,7 @@ ComAI supports:
 - `ollama`: local Ollama API, default `http://127.0.0.1:11434`
 - `lmstudio`: LM Studio local server, default `http://127.0.0.1:1234`
 - `openai`: OpenAI API with `OPENAI_API_KEY` or `providers.openai.api_key`
+- `gemini`: Gemini API with `GEMINI_API_KEY` or `providers.gemini.api_key`
 
 <div align="center">
   <a href="https://github.com/hossbit/local-ai-server">
@@ -124,6 +143,60 @@ comai status
 comai models
 comai provider
 ```
+
+## Models
+
+ComAI can list models from every configured provider, so you can use local
+models, Ollama models, LM Studio models, OpenAI models, and Gemini models from
+the same command line.
+
+```bash
+comai models
+```
+
+Example output:
+
+```text
+local (active):
+  Qwen2.5-Coder-7B-Instruct-Q4_K_M
+  Qwen3.5-9B-UD-IQ2_XXS
+  bge-m3-q8_0
+
+ollama:
+  qwen2.5-coder:7b
+
+lmstudio:
+  qwen/qwen3.5-9b
+
+openai:
+  gpt-4o-mini
+  gpt-4.1
+  gpt-4o
+
+gemini:
+  gemini-2.5-flash
+  gemini-2.5-pro
+  gemini-flash-latest
+```
+
+Use any listed model for one request:
+
+```bash
+comai --provider gemini --model gemini-2.5-flash "explain journalctl -u nginx"
+comai --gpt --model gpt-4o-mini "write a safe backup command"
+comai --ollama --model qwen2.5-coder:7b "explain this shell error"
+```
+
+Or save a provider's default model:
+
+```bash
+comai config set providers.gemini.model gemini-2.5-flash
+comai config set providers.openai.model gpt-4o-mini
+```
+
+Provider code lives under `lib/comai/providers/`. To add another API provider,
+add a provider module with the standard `model`, `api_base`, `status`, `models`,
+and `ask` functions, then register it in `lib/comai/providers/registry.sh`.
 
 ## Files And Logs
 

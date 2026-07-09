@@ -28,28 +28,59 @@ comai_add_file_once() {
 }
 
 comai_detect_mentioned_files() {
-  local arg word candidate
+  local arg text word candidate entry name i j phrase
+  local tokens=()
 
   [[ "${COMAI_PROVIDER:-local}" == "local" ]] || return 0
+  text="$(comai_join_args "${REQUEST_ARGS[@]}")"
 
   for arg in "${REQUEST_ARGS[@]}"; do
     read -r -a PARTS <<< "$arg"
     for word in "${PARTS[@]}"; do
       candidate="$(comai_clean_path_token "$word")"
       [[ -n "$candidate" ]] || continue
+      tokens+=("$candidate")
       [[ "$candidate" == -* ]] && continue
       if [[ -f "$candidate" ]]; then
         comai_add_file_once "$candidate"
       fi
     done
   done
+
+  for ((i = 0; i < ${#tokens[@]}; i++)); do
+    phrase=""
+    for ((j = i; j < ${#tokens[@]} && j < i + 8; j++)); do
+      if [[ -z "$phrase" ]]; then
+        phrase="${tokens[$j]}"
+      else
+        phrase="${phrase} ${tokens[$j]}"
+      fi
+      [[ "$phrase" == -* ]] && continue
+      if [[ -f "$phrase" ]]; then
+        comai_add_file_once "$phrase"
+      elif [[ -f "./$phrase" ]]; then
+        comai_add_file_once "./$phrase"
+      fi
+    done
+  done
+
+  while IFS= read -r entry; do
+    name="${entry#./}"
+    [[ "$name" == "$entry" ]] && name="${entry##*/}"
+    [[ "$name" == *" "* ]] || continue
+    case "$text" in
+      *"$name"* | *"$entry"*)
+        comai_add_file_once "$entry"
+        ;;
+    esac
+  done < <(find . -maxdepth 1 -type f -print 2> /dev/null)
 }
 
 comai_wants_directory_context() {
-  local text="${2:-${1,,}}"
+  local text="${1,,}"
 
   case "$text" in
-    *here* | *current\ director* | *this\ director* | *this\ folder* | *project* | *repo* | *file* | *files* | *folder* | *directory* | *script* | *log*)
+    *here* | *current\ director* | *this\ director* | *this\ folder* | *this\ repo* | *this\ project* | *in\ this\ project* | *in\ this\ repo* | *project\ files* | *repo\ files* | *list\ files* | *show\ files* | *newest\ file* | *largest\ file* | *biggest\ file* | *files\ here* | *scripts\ here* | *logs\ here*)
       return 0
       ;;
     *)
