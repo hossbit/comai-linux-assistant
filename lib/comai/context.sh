@@ -80,7 +80,7 @@ comai_wants_directory_context() {
   local text="${1,,}"
 
   case "$text" in
-    *here* | *current\ director* | *this\ director* | *this\ folder* | *this\ repo* | *this\ project* | *in\ this\ project* | *in\ this\ repo* | *project\ files* | *repo\ files* | *list\ files* | *show\ files* | *newest\ file* | *largest\ file* | *biggest\ file* | *files\ here* | *scripts\ here* | *logs\ here*)
+    *here* | *current\ director* | *this\ director* | *this\ folder* | *this\ repo* | *this\ project* | *project\ files* | *repo\ files* | *list\ files* | *show\ files* | *newest\ file* | *largest\ file* | *biggest\ file*)
       return 0
       ;;
     *)
