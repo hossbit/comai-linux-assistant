@@ -13,6 +13,7 @@
 ![LM Studio](https://img.shields.io/badge/LM%20Studio-supported-1F6FEB)
 ![OpenAI](https://img.shields.io/badge/OpenAI-supported-10A37F)
 ![Gemini](https://img.shields.io/badge/Gemini-supported-4285F4)
+![OpenRouter](https://img.shields.io/badge/OpenRouter-supported-6467F2)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Wiki](https://img.shields.io/badge/Wiki-documentation-blueviolet)](https://github.com/hossbit/comai-linux-assistant-wiki)
 
@@ -21,13 +22,14 @@
 **ComAI** is a Bash-powered AI assistant for your Linux terminal.
 
 Use it to ask Linux questions, explain commands before you run them, inspect
-files, scan logs, and talk to local AI, Ollama, OpenAI, or Gemini without leaving your
-shell. ComAI is the client; LocalAI is only one optional backend.
+files, scan logs, and talk to local AI, Ollama, OpenAI, Gemini, or OpenRouter
+without leaving your shell. ComAI is the client; LocalAI is only one optional
+backend.
 
 ## Why Use It
 
 - Works from any terminal with the simple `comai` command.
-- Supports LocalAI, Ollama, LM Studio, llama.cpp server, OpenAI, Gemini, and other OpenAI-compatible APIs.
+- Supports LocalAI, Ollama, LM Studio, llama.cpp server, OpenAI, Gemini, OpenRouter, and other OpenAI-compatible APIs.
 - Understands files and logs with `-f`.
 - Keeps setup and provider checks visible with `comai status`.
 - Installs as a user-space tool under `~/localcomai`.
@@ -83,6 +85,7 @@ comai opr hi
 Local mode is the default. Use `comai ollama ...` for Ollama,
 `comai lmstudio ...` for LM Studio, `comai gpt ...` for OpenAI,
 `comai gemini ...` for Gemini, and `comai opr ...` for OpenRouter.
+Short aliases also work: `olm`, `lms`, `gem`, `opr`.
 
 Use `--` when the first word of your question is also a provider name:
 
@@ -122,10 +125,10 @@ comai --max-tokens 900 "summarize this"
 ComAI supports:
 
 - `local`: any OpenAI-compatible local server, default `http://127.0.0.1:11435`
-- `ollama`: local Ollama API, default `http://127.0.0.1:11434`
-- `lmstudio`: LM Studio local server, default `http://127.0.0.1:1234`
-- `openai`: OpenAI API with `OPENAI_API_KEY` or `providers.openai.api_key`
-- `gemini`: Gemini API with `GEMINI_API_KEY` or `providers.gemini.api_key`
+- `ollama`: local Ollama API, default `http://127.0.0.1:11434` (alias: `olm`)
+- `lmstudio`: LM Studio local server, default `http://127.0.0.1:1234` (alias: `lms`)
+- `openai`: OpenAI API with `OPENAI_API_KEY` or `providers.openai.api_key` (alias: `gpt`, `chatgpt`)
+- `gemini`: Gemini API with `GEMINI_API_KEY` or `providers.gemini.api_key` (alias: `gem`)
 - `openrouter`: OpenRouter API with `OPENROUTER_API_KEY` or `providers.openrouter.api_key` (alias: `opr`)
 
 <div align="center">
@@ -145,6 +148,10 @@ comai status
 comai models
 comai provider
 ```
+
+`status`, `provider`, and `models` colorize connection results (green/yellow/red) when
+output is a real terminal. Force or disable it with `COMAI_COLOR=1`, `COMAI_COLOR=0`,
+or the standard `NO_COLOR=1`.
 
 ## Models
 
@@ -179,6 +186,19 @@ gemini:
   gemini-2.5-flash
   gemini-2.5-pro
   gemini-flash-latest
+
+openrouter:
+  openrouter/auto
+  anthropic/claude-sonnet-4.5
+  openai/gpt-5
+  ... (hundreds more)
+```
+
+OpenRouter's catalog alone can list hundreds of models. Narrow any provider's list with `--filter`:
+
+```bash
+comai models openrouter --filter claude
+comai models all --filter gemini
 ```
 
 Use any listed model for one request:
@@ -187,6 +207,7 @@ Use any listed model for one request:
 comai --provider gemini --model gemini-2.5-flash "explain journalctl -u nginx"
 comai --gpt --model gpt-4o-mini "write a safe backup command"
 comai --ollama --model qwen2.5-coder:7b "explain this shell error"
+comai opr --model anthropic/claude-sonnet-4.5 "explain this shell error"
 ```
 
 Or save a provider's default model:
@@ -194,6 +215,7 @@ Or save a provider's default model:
 ```bash
 comai config set providers.gemini.model gemini-2.5-flash
 comai config set providers.openai.model gpt-4o-mini
+comai config set providers.openrouter.model anthropic/claude-sonnet-4.5
 ```
 
 Provider code lives under `lib/comai/providers/`. To add another API provider,
