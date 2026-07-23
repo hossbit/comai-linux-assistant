@@ -82,6 +82,16 @@ comai_parse_args() {
       --gpt | --chatgpt)
         comai_provider_select openai
         ;;
+      opr)
+        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
+          comai_provider_select openrouter
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
+        ;;
+      --opr | --openrouter)
+        comai_provider_select openrouter
+        ;;
       --provider=*)
         provider_flag="${arg#--provider=}"
         if ! comai_provider_select "$provider_flag"; then

@@ -77,11 +77,12 @@ comai ollama hi
 comai lmstudio hi
 comai gpt hi
 comai gemini hi
+comai opr hi
 ```
 
 Local mode is the default. Use `comai ollama ...` for Ollama,
-`comai lmstudio ...` for LM Studio, `comai gpt ...` for OpenAI, and
-`comai gemini ...` for Gemini.
+`comai lmstudio ...` for LM Studio, `comai gpt ...` for OpenAI,
+`comai gemini ...` for Gemini, and `comai opr ...` for OpenRouter.
 
 Use `--` when the first word of your question is also a provider name:
 
@@ -125,6 +126,7 @@ ComAI supports:
 - `lmstudio`: LM Studio local server, default `http://127.0.0.1:1234`
 - `openai`: OpenAI API with `OPENAI_API_KEY` or `providers.openai.api_key`
 - `gemini`: Gemini API with `GEMINI_API_KEY` or `providers.gemini.api_key`
+- `openrouter`: OpenRouter API with `OPENROUTER_API_KEY` or `providers.openrouter.api_key` (alias: `opr`)
 
 <div align="center">
   <a href="https://github.com/hossbit/local-ai-server">
@@ -147,8 +149,8 @@ comai provider
 ## Models
 
 ComAI can list models from every configured provider, so you can use local
-models, Ollama models, LM Studio models, OpenAI models, and Gemini models from
-the same command line.
+models, Ollama models, LM Studio models, OpenAI models, Gemini models, and
+OpenRouter models from the same command line.
 
 ```bash
 comai models

@@ -457,6 +457,48 @@ merge_missing_config_defaults() {
     fi
   fi
 
+  if ! grep -Eq "^[[:space:]]{2}openrouter[[:space:]]*:" "$target_config"; then
+    block="$(
+      awk '
+        /^  openrouter[[:space:]]*:/ {
+          copy = 1
+        }
+        copy && /^[^[:space:]#][^:]*:/ {
+          exit
+        }
+        copy && /^  [A-Za-z0-9_-]+[[:space:]]*:/ && $0 !~ /^  openrouter[[:space:]]*:/ {
+          exit
+        }
+        copy {
+          print
+        }
+      ' "$source_config"
+    )"
+    if [[ -n "$block" ]]; then
+      tmp="$(secure_temp_for "$target_config")"
+      awk -v block="$block" '
+        BEGIN { in_providers = 0; added = 0 }
+        /^[^[:space:]#][^:]*:/ {
+          if (in_providers && !added) {
+            print block
+            added = 1
+          }
+          in_providers = ($0 ~ /^providers[[:space:]]*:/)
+        }
+        { print }
+        END {
+          if (in_providers && !added) {
+            print block
+          }
+        }
+      ' "$target_config" > "$tmp" && mv "$tmp" "$target_config"
+      if [[ -e "${tmp:-}" ]]; then
+        rm -f "$tmp"
+      fi
+      added+=("providers.openrouter")
+    fi
+  fi
+
   block=""
   while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" =~ ^[[:space:]]*# || -z "$line" ]]; then

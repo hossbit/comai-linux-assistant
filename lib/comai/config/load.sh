@@ -2,8 +2,10 @@ comai_load_config() {
   local config_file="${COMAI_CONFIG:-$COMAI_ROOT_DIR/config/comai.yaml}"
   local provider ai_dir api_base_url api_base_port model local_api_base local_model gpt_model ollama_api_base ollama_model lmstudio_api_base lmstudio_model openai_api_base openai_api_key openai_api_key_cmd
   local gemini_api_base gemini_model gemini_api_key gemini_api_key_cmd
+  local openrouter_api_base openrouter_model openrouter_api_key openrouter_api_key_cmd
   local provider_local_api_base provider_local_model provider_openai_api_base provider_openai_model provider_openai_api_key provider_openai_api_key_cmd
   local provider_gemini_api_base provider_gemini_model provider_gemini_api_key provider_gemini_api_key_cmd
+  local provider_openrouter_api_base provider_openrouter_model provider_openrouter_api_key provider_openrouter_api_key_cmd
   local provider_ollama_api_base provider_ollama_model provider_lmstudio_api_base provider_lmstudio_model
   local max_tokens timeout log_file file_max_bytes dir_context_max error_regex error_intent_regex
   local config_key config_value
@@ -32,6 +34,10 @@ comai_load_config() {
       gemini_model) gemini_model="$config_value" ;;
       gemini_api_key) gemini_api_key="$config_value" ;;
       gemini_api_key_cmd) gemini_api_key_cmd="$config_value" ;;
+      openrouter_api_base) openrouter_api_base="$config_value" ;;
+      openrouter_model) openrouter_model="$config_value" ;;
+      openrouter_api_key) openrouter_api_key="$config_value" ;;
+      openrouter_api_key_cmd) openrouter_api_key_cmd="$config_value" ;;
       max_tokens) max_tokens="$config_value" ;;
       timeout) timeout="$config_value" ;;
       log_file) log_file="$config_value" ;;
@@ -49,6 +55,10 @@ comai_load_config() {
       provider_gemini_model) provider_gemini_model="$config_value" ;;
       provider_gemini_api_key) provider_gemini_api_key="$config_value" ;;
       provider_gemini_api_key_cmd) provider_gemini_api_key_cmd="$config_value" ;;
+      provider_openrouter_api_base) provider_openrouter_api_base="$config_value" ;;
+      provider_openrouter_model) provider_openrouter_model="$config_value" ;;
+      provider_openrouter_api_key) provider_openrouter_api_key="$config_value" ;;
+      provider_openrouter_api_key_cmd) provider_openrouter_api_key_cmd="$config_value" ;;
       provider_ollama_api_base) provider_ollama_api_base="$config_value" ;;
       provider_ollama_model) provider_ollama_model="$config_value" ;;
       provider_lmstudio_api_base) provider_lmstudio_api_base="$config_value" ;;
@@ -70,6 +80,10 @@ comai_load_config() {
   gemini_model="${gemini_model:-${provider_gemini_model:-}}"
   gemini_api_key="${gemini_api_key:-${provider_gemini_api_key:-}}"
   gemini_api_key_cmd="${gemini_api_key_cmd:-${provider_gemini_api_key_cmd:-}}"
+  openrouter_api_base="${openrouter_api_base:-${provider_openrouter_api_base:-}}"
+  openrouter_model="${openrouter_model:-${provider_openrouter_model:-}}"
+  openrouter_api_key="${openrouter_api_key:-${provider_openrouter_api_key:-}}"
+  openrouter_api_key_cmd="${openrouter_api_key_cmd:-${provider_openrouter_api_key_cmd:-}}"
 
   api_base_url="${api_base_url:-http://127.0.0.1}"
   while [[ "$api_base_url" == */ && "$api_base_url" != "http://" && "$api_base_url" != "https://" ]]; do
@@ -102,6 +116,7 @@ comai_load_config() {
   COMAI_GEMINI_MODEL="${COMAI_GEMINI_MODEL:-${gemini_model:-gemini-2.5-flash}}"
   COMAI_OLLAMA_MODEL="${COMAI_OLLAMA_MODEL:-${ollama_model:-qwen2.5-coder:7b}}"
   COMAI_LMSTUDIO_MODEL="${COMAI_LMSTUDIO_MODEL:-${lmstudio_model:-local-model}}"
+  COMAI_OPENROUTER_MODEL="${COMAI_OPENROUTER_MODEL:-${openrouter_model:-openrouter/auto}}"
   if [[ -z "${COMAI_MODEL:-}" ]]; then
     case "$COMAI_PROVIDER" in
       openai)
@@ -116,6 +131,9 @@ comai_load_config() {
       lmstudio)
         COMAI_MODEL="$COMAI_LMSTUDIO_MODEL"
         ;;
+      openrouter)
+        COMAI_MODEL="$COMAI_OPENROUTER_MODEL"
+        ;;
       *)
         COMAI_MODEL="$COMAI_LOCAL_MODEL"
         ;;
@@ -125,6 +143,7 @@ comai_load_config() {
   COMAI_GEMINI_API_BASE="${COMAI_GEMINI_API_BASE:-${gemini_api_base:-https://generativelanguage.googleapis.com}}"
   COMAI_OLLAMA_API_BASE="${COMAI_OLLAMA_API_BASE:-${ollama_api_base}}"
   COMAI_LMSTUDIO_API_BASE="${COMAI_LMSTUDIO_API_BASE:-${lmstudio_api_base}}"
+  COMAI_OPENROUTER_API_BASE="${COMAI_OPENROUTER_API_BASE:-${openrouter_api_base:-https://openrouter.ai/api}}"
   if [[ -z "${COMAI_API_BASE:-}" ]]; then
     case "$COMAI_PROVIDER" in
       openai)
@@ -139,6 +158,9 @@ comai_load_config() {
       lmstudio)
         COMAI_API_BASE="$COMAI_LMSTUDIO_API_BASE"
         ;;
+      openrouter)
+        COMAI_API_BASE="$COMAI_OPENROUTER_API_BASE"
+        ;;
       *)
         COMAI_API_BASE="$COMAI_LOCAL_API_BASE"
         ;;
@@ -150,6 +172,9 @@ comai_load_config() {
   COMAI_GEMINI_API_KEY_CMD="${COMAI_GEMINI_API_KEY_CMD:-${gemini_api_key_cmd}}"
   COMAI_GEMINI_CONFIG_API_KEY="${COMAI_GEMINI_CONFIG_API_KEY:-${gemini_api_key}}"
   COMAI_GEMINI_API_KEY="${COMAI_GEMINI_API_KEY:-${GEMINI_API_KEY:-${COMAI_GEMINI_CONFIG_API_KEY}}}"
+  COMAI_OPENROUTER_API_KEY_CMD="${COMAI_OPENROUTER_API_KEY_CMD:-${openrouter_api_key_cmd}}"
+  COMAI_OPENROUTER_CONFIG_API_KEY="${COMAI_OPENROUTER_CONFIG_API_KEY:-${openrouter_api_key}}"
+  COMAI_OPENROUTER_API_KEY="${COMAI_OPENROUTER_API_KEY:-${OPENROUTER_API_KEY:-${COMAI_OPENROUTER_CONFIG_API_KEY}}}"
   COMAI_MAX_TOKENS="${COMAI_MAX_TOKENS:-${max_tokens:-900}}"
   COMAI_TIMEOUT="${COMAI_TIMEOUT:-${timeout:-120}}"
   log_file="${log_file:-logs/comai.log}"
@@ -199,6 +224,7 @@ Examples:
   comai ollama hi
   comai lmstudio hi
   comai gemini hi
+  comai opr hi
   comai --model=MODEL ask anything
   comai --provider gemini --model gemini-2.5-flash hi
   comai -- ollama is a provider name, but treat this as my question
@@ -212,6 +238,8 @@ Options:
   --lmstudio                   Use LM Studio for this request
   gemini                       Use Gemini for this request
   --gemini                     Use Gemini for this request
+  opr, openrouter              Use OpenRouter for this request
+  --opr, --openrouter          Use OpenRouter for this request
   --model MODEL, --model=MODEL   Use a different model for this request
   --api-base URL, --api-base=URL Use a different provider API base
   --max-tokens N                Limit answer length; N must be a positive integer
@@ -227,6 +255,8 @@ Environment:
   COMAI_OPENAI_API_KEY_CMD     Command that prints an OpenAI API key, for example: pass show openai
   GEMINI_API_KEY               Overrides providers.gemini.api_key for: comai gemini ...
   COMAI_GEMINI_API_KEY_CMD     Command that prints a Gemini API key, for example: pass show gemini
+  OPENROUTER_API_KEY           Overrides providers.openrouter.api_key for: comai opr ...
+  COMAI_OPENROUTER_API_KEY_CMD Command that prints an OpenRouter API key, for example: pass show openrouter
   COMAI_PROVIDER=$COMAI_PROVIDER
   COMAI_MODEL=$COMAI_MODEL
   COMAI_API_BASE=$COMAI_API_BASE
@@ -240,6 +270,9 @@ Environment:
   COMAI_GEMINI_MODEL=$COMAI_GEMINI_MODEL
   COMAI_GEMINI_API_BASE=$COMAI_GEMINI_API_BASE
   COMAI_GEMINI_API_KEY=${COMAI_GEMINI_API_KEY:+set}
+  COMAI_OPENROUTER_MODEL=$COMAI_OPENROUTER_MODEL
+  COMAI_OPENROUTER_API_BASE=$COMAI_OPENROUTER_API_BASE
+  COMAI_OPENROUTER_API_KEY=${COMAI_OPENROUTER_API_KEY:+set}
   COMAI_OLLAMA_MODEL=$COMAI_OLLAMA_MODEL
   COMAI_OLLAMA_API_BASE=$COMAI_OLLAMA_API_BASE
   COMAI_LMSTUDIO_MODEL=$COMAI_LMSTUDIO_MODEL
@@ -270,6 +303,10 @@ comai_select_openai_provider() {
 
 comai_select_gemini_provider() {
   comai_provider_select gemini
+}
+
+comai_select_openrouter_provider() {
+  comai_provider_select openrouter
 }
 
 comai_select_ollama_provider() {

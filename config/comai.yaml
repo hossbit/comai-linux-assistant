@@ -1,4 +1,4 @@
-# Default provider. Use "local", "ollama", "lmstudio", "openai", or "gemini".
+# Default provider. Use "local", "ollama", "lmstudio", "openai", "gemini", or "openrouter".
 provider: local
 
 # Optional LocalAI helper directory. This is only used by the start/stop helper service.
@@ -38,6 +38,15 @@ providers:
     # Optional Gemini API key. Prefer GEMINI_API_KEY in your shell for better safety.
     api_key:
     # Optional command that prints the API key, for example: pass show gemini
+    api_key_cmd:
+
+  # OpenRouter API base URL without a trailing /v1 path.
+  openrouter:
+    api_base: https://openrouter.ai/api
+    model: openrouter/auto
+    # Optional OpenRouter API key. Prefer OPENROUTER_API_KEY in your shell for better safety.
+    api_key:
+    # Optional command that prints the API key, for example: pass show openrouter
     api_key_cmd:
 
 # Maximum tokens requested from the model.

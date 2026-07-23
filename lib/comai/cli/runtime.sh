@@ -41,10 +41,7 @@ comai_confirm_cloud_file_context() {
   local answer
 
   [[ "${#FILES[@]}" -gt 0 ]] || return 0
-  case "$COMAI_PROVIDER" in
-    openai | gemini) ;;
-    *) return 0 ;;
-  esac
+  comai_provider_requires_key "$COMAI_PROVIDER" || return 0
 
   comai_error "notice: ${#FILES[@]} file(s) will be sent to the ${COMAI_PROVIDER} cloud provider as prompt context."
   if [[ "${COMAI_ASSUME_YES:-0}" == "1" || "${COMAI_CLOUD_FILE_CONFIRM:-1}" == "0" ]]; then
@@ -71,6 +68,58 @@ comai_spinner_enabled() {
     1 | true | yes) return 0 ;;
   esac
   [[ -t 2 ]]
+}
+
+comai_color_enabled() {
+  case "${COMAI_COLOR:-auto}" in
+    0 | false | no) return 1 ;;
+    1 | true | yes) return 0 ;;
+  esac
+  [[ -z "${NO_COLOR:-}" && -t 1 ]]
+}
+
+comai_color_cache() {
+  if comai_color_enabled; then
+    COMAI_COLOR=1
+  else
+    COMAI_COLOR=0
+  fi
+}
+
+comai_color() {
+  local code="$1"
+  shift
+  if comai_color_enabled; then
+    printf '\033[%sm%s\033[0m' "$code" "$*"
+  else
+    printf '%s' "$*"
+  fi
+}
+
+comai_color_ok() {
+  comai_color '32' "$@"
+}
+
+comai_color_warn() {
+  comai_color '33' "$@"
+}
+
+comai_color_fail() {
+  comai_color '31' "$@"
+}
+
+comai_color_dim() {
+  comai_color '2' "$@"
+}
+
+comai_format_status_text() {
+  local text="$1"
+
+  case "$text" in
+    ok) comai_color_ok "$text" ;;
+    *"not checked"*) comai_color_warn "$text" ;;
+    *) comai_color_fail "$text" ;;
+  esac
 }
 
 comai_spinner_frames() {

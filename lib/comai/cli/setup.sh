@@ -71,6 +71,22 @@ comai_cmd_setup() {
         fi
       fi
       ;;
+    openrouter)
+      printf 'OpenRouter API base (%s): ' "$COMAI_OPENROUTER_API_BASE"
+      read -r api
+      printf 'OpenRouter model (%s): ' "$COMAI_OPENROUTER_MODEL"
+      read -r model
+      comai_set_provider_config_value openrouter api_base "${api:-$COMAI_OPENROUTER_API_BASE}"
+      comai_set_provider_config_value openrouter model "${model:-$COMAI_OPENROUTER_MODEL}"
+      if [[ -z "${COMAI_OPENROUTER_API_KEY:-}" ]]; then
+        printf 'OpenRouter API key (leave blank to use OPENROUTER_API_KEY later): '
+        read -r key
+        if [[ -n "$key" ]]; then
+          comai_set_provider_config_value openrouter api_key "$key"
+          comai_secure_config_file "$COMAI_CONFIG_FILE"
+        fi
+      fi
+      ;;
   esac
 
   printf 'Saved setup to %s\n' "$COMAI_CONFIG_FILE"

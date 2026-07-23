@@ -26,6 +26,7 @@ comai_source_provider_module ollama
 comai_source_provider_module lmstudio
 comai_source_provider_module openai
 comai_source_provider_module gemini
+comai_source_provider_module openrouter
 
 # shellcheck source=../lib/comai/args.sh
 . "$COMAI_ROOT_DIR/lib/comai/args.sh"
@@ -36,7 +37,7 @@ comai_source_provider_module gemini
 # shellcheck source=../lib/comai/ai.sh
 . "$COMAI_ROOT_DIR/lib/comai/ai.sh"
 
-COMAI_VERSION="2.5.1"
+COMAI_VERSION="2.6.0"
 COMAI_HISTORY_FILE="${COMAI_HISTORY_FILE:-$HOME/.local/share/comai/history.log}"
 COMAI_SOURCE_URL="${COMAI_SOURCE_URL:-https://github.com/hossbit/comai-linux-assistant.git}"
 COMAI_TARBALL_BASE="${COMAI_TARBALL_BASE:-https://github.com/hossbit/comai-linux-assistant/archive}"
