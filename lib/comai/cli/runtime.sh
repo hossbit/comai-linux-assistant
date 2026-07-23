@@ -201,7 +201,7 @@ comai_run_with_spinner_capture() {
 
 comai_run_request() {
   local text text_lc dir_context files prompt
-  local response
+  local response ready_status
 
   comai_parse_args "$@" || return 1
   comai_detect_mentioned_files
@@ -235,12 +235,25 @@ comai_run_request() {
     fi
   fi
 
-  if [[ "$COMAI_PROVIDER" == "local" ]] && ! comai_local_ai_ready; then
-    comai_log error request_failed "provider=$COMAI_PROVIDER model=$COMAI_MODEL reason=local_api_unreachable api_base=$COMAI_API_BASE"
-    comai_error "Local provider API is not responding at ${COMAI_API_BASE}."
-    comai_error "Start your OpenAI-compatible local server, or edit: ${COMAI_CONFIG_FILE}"
-    comai_error "For the bundled LocalAI helper, run: systemctl --user start comai-localai.service"
-    return 1
+  if [[ "$COMAI_PROVIDER" == "local" ]]; then
+    ready_status=0
+    comai_local_ai_ready || ready_status=$?
+    case "$ready_status" in
+      0) ;;
+      2)
+        comai_log error request_failed "provider=$COMAI_PROVIDER model=$COMAI_MODEL reason=local_api_unauthorized api_base=$COMAI_API_BASE"
+        comai_error "Local provider API at ${COMAI_API_BASE} returned 401 Unauthorized."
+        comai_error "Set providers.local.api_key in ${COMAI_CONFIG_FILE}, or export LOCALAI_API_KEY."
+        return 1
+        ;;
+      *)
+        comai_log error request_failed "provider=$COMAI_PROVIDER model=$COMAI_MODEL reason=local_api_unreachable api_base=$COMAI_API_BASE"
+        comai_error "Local provider API is not responding at ${COMAI_API_BASE}."
+        comai_error "Start your OpenAI-compatible local server, or edit: ${COMAI_CONFIG_FILE}"
+        comai_error "For the bundled LocalAI helper, run: systemctl --user start comai-localai.service"
+        return 1
+        ;;
+    esac
   fi
 
   comai_confirm_cloud_file_context || return 1

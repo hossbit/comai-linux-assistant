@@ -22,6 +22,14 @@ comai_cmd_setup() {
       read -r model
       comai_set_provider_config_value local api_base "${api:-$COMAI_LOCAL_API_BASE}"
       comai_set_provider_config_value local model "${model:-$COMAI_LOCAL_MODEL}"
+      if [[ -z "${COMAI_LOCAL_API_KEY:-}" ]]; then
+        printf 'Local API key (leave blank if the server has no active keys): '
+        read -r key
+        if [[ -n "$key" ]]; then
+          comai_set_provider_config_value local api_key "$key"
+          comai_secure_config_file "$COMAI_CONFIG_FILE"
+        fi
+      fi
       ;;
     ollama)
       printf 'Ollama API base (%s): ' "$COMAI_OLLAMA_API_BASE"

@@ -124,7 +124,7 @@ comai --max-tokens 900 "summarize this"
 
 ComAI supports:
 
-- `local`: any OpenAI-compatible local server, default `http://127.0.0.1:11435`
+- `local`: any OpenAI-compatible local server, default `http://127.0.0.1:11435`; optional `LOCALAI_API_KEY` or `providers.local.api_key` if the server has active keys (e.g. via `localai key create`) -- unauthenticated by default
 - `ollama`: local Ollama API, default `http://127.0.0.1:11434` (alias: `olm`)
 - `lmstudio`: LM Studio local server, default `http://127.0.0.1:1234` (alias: `lms`)
 - `openai`: OpenAI API with `OPENAI_API_KEY` or `providers.openai.api_key` (alias: `gpt`, `chatgpt`)

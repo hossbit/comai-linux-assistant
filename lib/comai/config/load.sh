@@ -1,9 +1,9 @@
 comai_load_config() {
   local config_file="${COMAI_CONFIG:-$COMAI_ROOT_DIR/config/comai.yaml}"
-  local provider ai_dir api_base_url api_base_port model local_api_base local_model gpt_model ollama_api_base ollama_model lmstudio_api_base lmstudio_model openai_api_base openai_api_key openai_api_key_cmd
+  local provider ai_dir api_base_url api_base_port model local_api_base local_model local_api_key local_api_key_cmd gpt_model ollama_api_base ollama_model lmstudio_api_base lmstudio_model openai_api_base openai_api_key openai_api_key_cmd
   local gemini_api_base gemini_model gemini_api_key gemini_api_key_cmd
   local openrouter_api_base openrouter_model openrouter_api_key openrouter_api_key_cmd
-  local provider_local_api_base provider_local_model provider_openai_api_base provider_openai_model provider_openai_api_key provider_openai_api_key_cmd
+  local provider_local_api_base provider_local_model provider_local_api_key provider_local_api_key_cmd provider_openai_api_base provider_openai_model provider_openai_api_key provider_openai_api_key_cmd
   local provider_gemini_api_base provider_gemini_model provider_gemini_api_key provider_gemini_api_key_cmd
   local provider_openrouter_api_base provider_openrouter_model provider_openrouter_api_key provider_openrouter_api_key_cmd
   local provider_ollama_api_base provider_ollama_model provider_lmstudio_api_base provider_lmstudio_model
@@ -21,6 +21,8 @@ comai_load_config() {
       model) model="$config_value" ;;
       local_api_base) local_api_base="$config_value" ;;
       local_model) local_model="$config_value" ;;
+      local_api_key) local_api_key="$config_value" ;;
+      local_api_key_cmd) local_api_key_cmd="$config_value" ;;
       gpt_model) gpt_model="$config_value" ;;
       ollama_api_base) ollama_api_base="$config_value" ;;
       ollama_model) ollama_model="$config_value" ;;
@@ -47,6 +49,8 @@ comai_load_config() {
       error_intent_regex) error_intent_regex="$config_value" ;;
       provider_local_api_base) provider_local_api_base="$config_value" ;;
       provider_local_model) provider_local_model="$config_value" ;;
+      provider_local_api_key) provider_local_api_key="$config_value" ;;
+      provider_local_api_key_cmd) provider_local_api_key_cmd="$config_value" ;;
       provider_openai_api_base) provider_openai_api_base="$config_value" ;;
       provider_openai_model) provider_openai_model="$config_value" ;;
       provider_openai_api_key) provider_openai_api_key="$config_value" ;;
@@ -68,6 +72,8 @@ comai_load_config() {
 
   local_api_base="${local_api_base:-${provider_local_api_base:-}}"
   local_model="${local_model:-${provider_local_model:-}}"
+  local_api_key="${local_api_key:-${provider_local_api_key:-}}"
+  local_api_key_cmd="${local_api_key_cmd:-${provider_local_api_key_cmd:-}}"
   gpt_model="${gpt_model:-${provider_openai_model:-}}"
   ollama_api_base="${ollama_api_base:-${provider_ollama_api_base:-}}"
   ollama_model="${ollama_model:-${provider_ollama_model:-}}"
@@ -112,6 +118,9 @@ comai_load_config() {
   COMAI_AI_DIR="${COMAI_AI_DIR:-$ai_dir}"
   COMAI_LOCAL_MODEL="${COMAI_LOCAL_MODEL:-${local_model:-${model:-Qwen2.5-Coder-7B-Instruct-Q4_K_M}}}"
   COMAI_LOCAL_API_BASE="${COMAI_LOCAL_API_BASE:-${local_api_base}}"
+  COMAI_LOCAL_API_KEY_CMD="${COMAI_LOCAL_API_KEY_CMD:-${local_api_key_cmd}}"
+  COMAI_LOCAL_CONFIG_API_KEY="${COMAI_LOCAL_CONFIG_API_KEY:-${local_api_key}}"
+  COMAI_LOCAL_API_KEY="${COMAI_LOCAL_API_KEY:-${LOCALAI_API_KEY:-${COMAI_LOCAL_CONFIG_API_KEY}}}"
   COMAI_OPENAI_MODEL="${COMAI_OPENAI_MODEL:-${gpt_model:-gpt-4o-mini}}"
   COMAI_GEMINI_MODEL="${COMAI_GEMINI_MODEL:-${gemini_model:-gemini-2.5-flash}}"
   COMAI_OLLAMA_MODEL="${COMAI_OLLAMA_MODEL:-${ollama_model:-qwen2.5-coder:7b}}"
@@ -251,6 +260,8 @@ Config:
   $COMAI_ROOT_DIR/config/comai.yaml
 
 Environment:
+  LOCALAI_API_KEY              Overrides providers.local.api_key, only needed if your local server requires auth
+  COMAI_LOCAL_API_KEY_CMD      Command that prints a local-server API key, for example: pass show localai
   OPENAI_API_KEY               Overrides openai_api_key for: comai gpt ...
   COMAI_OPENAI_API_KEY_CMD     Command that prints an OpenAI API key, for example: pass show openai
   GEMINI_API_KEY               Overrides providers.gemini.api_key for: comai gemini ...
@@ -262,6 +273,7 @@ Environment:
   COMAI_API_BASE=$COMAI_API_BASE
   COMAI_LOCAL_MODEL=$COMAI_LOCAL_MODEL
   COMAI_LOCAL_API_BASE=$COMAI_LOCAL_API_BASE
+  COMAI_LOCAL_API_KEY=${COMAI_LOCAL_API_KEY:+set}
   COMAI_AI_DIR=$COMAI_AI_DIR
   COMAI_ERROR_INTENT_RE=$COMAI_ERROR_INTENT_RE
   COMAI_OPENAI_MODEL=$COMAI_OPENAI_MODEL
@@ -293,8 +305,16 @@ comai_join_args() {
   printf '%s' "$*"
 }
 
+# comai_local_ai_ready: 0 ready, 1 unreachable, 2 reachable but unauthorized
+# (server has active keys but comai has no working one configured for it).
 comai_local_ai_ready() {
-  comai_have curl && curl --max-time 2 -fsS "${COMAI_API_BASE}/v1/models" > /dev/null 2>&1
+  local http_status
+
+  comai_have curl || return 1
+  comai_local_ensure_api_key
+  http_status="$(comai_local_curl --max-time 2 -sS -o /dev/null -w '%{http_code}' "${COMAI_API_BASE}/v1/models" 2> /dev/null)" || return 1
+  [[ "$http_status" == "401" ]] && return 2
+  [[ "$http_status" -ge 200 && "$http_status" -lt 300 ]] 2> /dev/null || return 1
 }
 
 comai_select_openai_provider() {

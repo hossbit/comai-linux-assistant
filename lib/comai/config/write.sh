@@ -87,6 +87,10 @@ comai_set_provider_config_value() {
         changed = 1
         next
       }
+      in_provider && !changed && $0 ~ "^[[:space:]]*$" {
+        print "    " key ": " value
+        changed = 1
+      }
       in_provider && $0 ~ "^[[:space:]][[:space:]][A-Za-z0-9_-]+[[:space:]]*:" {
         if (!changed) {
           print "    " key ": " value

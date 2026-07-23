@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 
+# comai_openai_compatible_curl: the default curl runner used by ask/status/
+# models below. Providers that need to attach auth (currently: local) pass
+# their own runner function name as the trailing argument instead.
+comai_openai_compatible_curl() {
+  curl "$@"
+}
+
 comai_openai_compatible_ask() {
   local prompt="$1"
   local label="$2"
   local system_prompt="$3"
+  local curl_runner="${4:-comai_openai_compatible_curl}"
   local response content http_status response_body
 
   if ! comai_have curl || ! comai_have jq; then
@@ -28,7 +36,7 @@ comai_openai_compatible_ask() {
         max_tokens: ($max_tokens | tonumber),
         stream: false
       }' |
-      curl --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/chat/completions" \
+      "$curl_runner" --max-time "$COMAI_TIMEOUT" -sS -w '\n%{http_code}' "${COMAI_API_BASE}/v1/chat/completions" \
         -H 'Content-Type: application/json' \
         --data-binary @-
   )"
@@ -60,6 +68,11 @@ comai_openai_compatible_ask() {
       comai_error "Check the provider model and api_base in: ${COMAI_CONFIG_FILE}"
       return 1
     fi
+    if [[ "$http_status" == "401" ]]; then
+      comai_error "${label} returned 401 Unauthorized."
+      comai_error "This server now requires an API key. Set an api_key for it in: ${COMAI_CONFIG_FILE}"
+      return 1
+    fi
     if [[ -n "$content" ]]; then
       comai_error "${label} API error ${http_status}: ${content}"
     else
@@ -83,14 +96,16 @@ comai_openai_compatible_ask() {
 
 comai_openai_compatible_models() {
   local api_base="$1"
+  local curl_runner="${2:-comai_openai_compatible_curl}"
 
   comai_warn_insecure_api_base "OpenAI-compatible provider" "$api_base"
-  curl --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/v1/models" | jq -r '.data[]?.id'
+  "$curl_runner" --max-time "$COMAI_TIMEOUT" -fsS "${api_base}/v1/models" | jq -r '.data[]?.id'
 }
 
 comai_openai_compatible_status() {
   local api_base="$1"
+  local curl_runner="${2:-comai_openai_compatible_curl}"
 
   comai_warn_insecure_api_base "OpenAI-compatible provider" "$api_base"
-  curl --max-time 2 -fsS "${api_base}/v1/models" > /dev/null 2>&1
+  "$curl_runner" --max-time 2 -fsS "${api_base}/v1/models" > /dev/null 2>&1
 }

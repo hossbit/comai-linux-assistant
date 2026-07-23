@@ -117,4 +117,13 @@ comai_provider_allow_key_cmd() {
       printf -v "COMAI_ALLOW_${upper}_KEY_CMD" '%s' 0
     fi
   done
+
+  # "local" isn't in COMAI_KEY_PROVIDERS (its key is optional, not required
+  # -- see comai_provider_requires_key), but its api_key_cmd still deserves
+  # the same anti-leak deferral as the required-key providers above.
+  if [[ "$target" == "local" ]]; then
+    COMAI_ALLOW_LOCAL_KEY_CMD=1
+  else
+    COMAI_ALLOW_LOCAL_KEY_CMD=0
+  fi
 }

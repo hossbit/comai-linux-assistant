@@ -11,6 +11,13 @@ providers:
   local:
     api_base: http://127.0.0.1:11435
     model: Qwen2.5-Coder-7B-Instruct-Q4_K_M
+    # Optional API key, only needed if your local server has active keys
+    # (for example after running `localai key create`). Leave blank if it
+    # doesn't — that's the default, and requests stay unauthenticated.
+    # Prefer LOCALAI_API_KEY in your shell for better safety.
+    api_key:
+    # Optional command that prints the API key, for example: pass show localai
+    api_key_cmd:
 
   # Ollama API base URL without a trailing API path.
   ollama:
