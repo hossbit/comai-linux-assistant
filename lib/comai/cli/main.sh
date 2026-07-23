@@ -28,12 +28,36 @@ comai_parse_global_prefix() {
         comai_provider_select openrouter
         shift
         ;;
+      lms)
+        comai_provider_select lmstudio
+        shift
+        ;;
+      olm)
+        comai_provider_select ollama
+        shift
+        ;;
+      gem)
+        comai_provider_select gemini
+        shift
+        ;;
       --gpt | --chatgpt)
         comai_provider_select openai
         shift
         ;;
       --opr | --openrouter)
         comai_provider_select openrouter
+        shift
+        ;;
+      --lms)
+        comai_provider_select lmstudio
+        shift
+        ;;
+      --olm)
+        comai_provider_select ollama
+        shift
+        ;;
+      --gem)
+        comai_provider_select gemini
         shift
         ;;
       --provider=*)

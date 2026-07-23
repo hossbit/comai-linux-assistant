@@ -232,12 +232,12 @@ Examples:
 Options:
   gpt, chatgpt                 Use OpenAI ChatGPT for this request
   --gpt, --chatgpt             Use OpenAI ChatGPT for this request
-  ollama                       Use Ollama for this request
-  --ollama                     Use Ollama for this request
-  lmstudio                     Use LM Studio for this request
-  --lmstudio                   Use LM Studio for this request
-  gemini                       Use Gemini for this request
-  --gemini                     Use Gemini for this request
+  ollama, olm                  Use Ollama for this request
+  --ollama, --olm              Use Ollama for this request
+  lmstudio, lms                Use LM Studio for this request
+  --lmstudio, --lms            Use LM Studio for this request
+  gemini, gem                  Use Gemini for this request
+  --gemini, --gem              Use Gemini for this request
   opr, openrouter              Use OpenRouter for this request
   --opr, --openrouter          Use OpenRouter for this request
   --model MODEL, --model=MODEL   Use a different model for this request

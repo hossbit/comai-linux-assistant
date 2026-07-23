@@ -92,6 +92,36 @@ comai_parse_args() {
       --opr | --openrouter)
         comai_provider_select openrouter
         ;;
+      lms)
+        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
+          comai_provider_select lmstudio
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
+        ;;
+      --lms)
+        comai_provider_select lmstudio
+        ;;
+      olm)
+        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
+          comai_provider_select ollama
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
+        ;;
+      --olm)
+        comai_provider_select ollama
+        ;;
+      gem)
+        if [[ "${#REQUEST_ARGS[@]}" -eq 0 ]]; then
+          comai_provider_select gemini
+        else
+          REQUEST_ARGS+=("$arg")
+        fi
+        ;;
+      --gem)
+        comai_provider_select gemini
+        ;;
       --provider=*)
         provider_flag="${arg#--provider=}"
         if ! comai_provider_select "$provider_flag"; then
