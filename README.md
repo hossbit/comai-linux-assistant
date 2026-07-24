@@ -19,6 +19,13 @@
 
 </div>
 
+<div align="center">
+
+<a href="https://github.com/hossbit/comai-linux-assistant/releases/latest"><img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-badge-release.svg" alt="Latest Release" height="68"></a>
+<a href="https://github.com/hossbit/comai-linux-assistant/pulse"><img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-badge-download.svg" alt="Downloads" height="68"></a>
+<a href="https://github.com/hossbit/comai-linux-assistant/stargazers"><img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-badge-stars.svg" alt="GitHub Stars" height="68"></a>
+</div>
+
 **ComAI** is a Bash-powered AI assistant for your Linux terminal.
 
 Use it to ask Linux questions, explain commands before you run them, inspect
