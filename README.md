@@ -1,7 +1,7 @@
 # ComAI - Linux Terminal AI Assistant
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-hero.png" alt="ComAI local AI assistant for Linux" width="900">
+  <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-hero.webp" alt="ComAI local AI assistant for Linux" width="900">
 </div>
 
 <div align="center">
@@ -140,7 +140,7 @@ ComAI supports:
 
 <div align="center">
   <a href="https://github.com/hossbit/local-ai-server">
-    <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/local-ai-server.png" alt="Local AI Server" width="300">
+    <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/local-ai-server.webp" alt="Local AI Server" width="300">
     <br>
     <strong>hossbit/local-ai-server</strong>
   </a>
@@ -291,9 +291,9 @@ installed.
 
 <div align="center">
   <a href="https://buymeacoffee.com/mirhh">
-    <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/bmc-button.png" alt="Buy me a coffee" width="300">
+    <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/bmc-button.webp" alt="Buy me a coffee" width="300">
   </a>
 </div>
 <div align="center">
-  <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/give-it-a-star.png" alt="If this repo helped you, give it a star" width="100%">
+  <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/give-it-a-star.webp" alt="If this repo helped you, give it a star" width="100%">
 </div>
