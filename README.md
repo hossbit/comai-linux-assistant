@@ -33,6 +33,18 @@ files, scan logs, and talk to local AI, Ollama, OpenAI, Gemini, or OpenRouter
 without leaving your shell. ComAI is the client; LocalAI is only one optional
 backend.
 
+## ❤️ Support
+
+If you find ComAI useful, you can support its continued development:
+
+<div align="center">
+  <a href="https://buymeacoffee.com/mirhh">
+    <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/bmc-button.webp" alt="Buy me a coffee" width="300">
+  </a>
+</div>
+
+⭐ Starring and sharing the repository also helps a lot.
+
 ## Why Use It
 
 - Works from any terminal with the simple `comai` command.
