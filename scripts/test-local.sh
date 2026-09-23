@@ -38,27 +38,11 @@ run_with_awk() {
 
   printf 'awk: %s (%s)\n' "$label" "$awk_path"
 
-  PATH="$tmp_dir:$PATH" bash -n \
-    "$ROOT_DIR/bin/comai" \
-    "$ROOT_DIR/lib/comai/config.sh" \
-    "$ROOT_DIR/lib/comai/config/yaml.sh" \
-    "$ROOT_DIR/lib/comai/config/files.sh" \
-    "$ROOT_DIR/lib/comai/config/write.sh" \
-    "$ROOT_DIR/lib/comai/config/keys.sh" \
-    "$ROOT_DIR/lib/comai/config/load.sh" \
-    "$ROOT_DIR/lib/comai/args.sh" \
-    "$ROOT_DIR/lib/comai/providers/registry.sh" \
-    "$ROOT_DIR/lib/comai/providers/openai-compatible.sh" \
-    "$ROOT_DIR/lib/comai/providers/local.sh" \
-    "$ROOT_DIR/lib/comai/providers/ollama.sh" \
-    "$ROOT_DIR/lib/comai/providers/lmstudio.sh" \
-    "$ROOT_DIR/lib/comai/providers/openai.sh" \
-    "$ROOT_DIR/lib/comai/providers/gemini.sh" \
-    "$ROOT_DIR/lib/comai/context.sh" \
-    "$ROOT_DIR/lib/comai/local-checks.sh" \
-    "$ROOT_DIR/lib/comai/ai.sh" \
-    "$ROOT_DIR/tests/core.sh" \
-    "$ROOT_DIR/scripts/uninstall.sh"
+  local source_file
+  while IFS= read -r source_file; do
+    bash -n "$source_file"
+  done < <(find "$ROOT_DIR/lib" "$ROOT_DIR/scripts" "$ROOT_DIR/tests" -name '*.sh' -type f)
+  bash -n "$ROOT_DIR/bin/comai"
 
   output="$(
     PATH="$tmp_dir:$PATH" bash -c '
@@ -81,8 +65,8 @@ run_with_awk() {
       printf "Hello   ,,, world\nword word test\n\n\n" | comai_clean_ai_output
     ' bash "$ROOT_DIR"
   )"
-  assert_contains "$output" 'Hello, world'
-  assert_contains "$output" 'word test'
+  assert_contains "$output" 'Hello   ,,, world'
+  assert_contains "$output" 'word word test'
 
   output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" config get provider)"
   [[ "$output" == "local" ]]

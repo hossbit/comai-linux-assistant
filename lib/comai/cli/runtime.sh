@@ -71,6 +71,7 @@ comai_spinner_enabled() {
 }
 
 comai_color_enabled() {
+  [[ -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]] || return 1
   case "${COMAI_COLOR:-auto}" in
     0 | false | no) return 1 ;;
     1 | true | yes) return 0 ;;
@@ -201,7 +202,10 @@ comai_run_with_spinner_capture() {
 
 comai_run_request() {
   local text text_lc dir_context files prompt
-  local response ready_status
+  local response ready_status local_handler
+
+  COMAI_LAST_RESPONSE=""
+  COMAI_FILES_SEEN=()
 
   comai_parse_args "$@" || return 1
   comai_detect_mentioned_files
@@ -214,25 +218,15 @@ comai_run_request() {
   comai_log info request_start "provider=$COMAI_PROVIDER model=$COMAI_MODEL chars=${#text} files=${#FILES[@]}"
 
   if [[ "$COMAI_PROVIDER" == "local" ]]; then
-    if comai_answer_local_file_fact "$text" "$text_lc"; then
-      comai_log info local_answer "kind=file_fact chars=${#text}"
-      return 0
-    fi
-
-    if comai_answer_file_contains "$text" "$text_lc"; then
-      comai_log info local_answer "kind=file_contains chars=${#text}"
-      return 0
-    fi
-
-    if comai_answer_file_errors "$text" "$text_lc"; then
-      comai_log info local_answer "kind=file_errors chars=${#text}"
-      return 0
-    fi
-
-    if comai_answer_file_description "$text" "$text_lc"; then
-      comai_log info local_answer "kind=file_description chars=${#text}"
-      return 0
-    fi
+    for local_handler in comai_answer_local_file_fact comai_answer_file_contains comai_answer_file_errors comai_answer_file_description; do
+      if response="$("$local_handler" "$text" "$text_lc")"; then
+        printf '%s\n' "$response" | comai_strip_terminal_controls
+        COMAI_LAST_RESPONSE="$response"
+        comai_history_add "$text" "$response"
+        comai_log info local_answer "kind=$local_handler chars=${#text}"
+        return 0
+      fi
+    done
   fi
 
   if [[ "$COMAI_PROVIDER" == "local" ]]; then
@@ -275,40 +269,98 @@ comai_run_request() {
   comai_log info request_ok "provider=$COMAI_PROVIDER model=$COMAI_MODEL response_chars=${#response}"
 }
 
-comai_cmd_chat() {
-  local line chat_context chat_prompt max_context
+comai_chat_status() {
+  printf 'Provider: %s | Model: %s | Context: %s/%s characters\n' \
+    "$COMAI_PROVIDER" "$COMAI_MODEL" "$1" "$2" | comai_strip_terminal_controls
+}
 
-  printf 'ComAI chat. Type /exit to quit.\n'
-  chat_context=""
+comai_chat_help() {
+  printf '%s\n' \
+    '/help    Show chat commands' \
+    '/status  Show provider, model, and context usage' \
+    '/clear   Start a fresh conversation (saved history is unchanged)' \
+    '/exit    Leave chat (also /quit or Ctrl-D)' \
+    'Use // to send a message beginning with /.'
+}
+
+comai_cmd_chat() {
+  local line chat_context="" chat_prompt max_context turn interactive=0 chat_status=0
+  local -a turns=() chat_files=() request_options=()
+
   max_context="${COMAI_CHAT_CONTEXT_MAX:-12000}"
+  if [[ ! "$max_context" =~ ^[1-9][0-9]{0,8}$ ]]; then
+    comai_error 'COMAI_CHAT_CONTEXT_MAX must be a positive integer below 1000000000.'
+    return 1
+  fi
+  comai_parse_args "$@" || return 1
+  if [[ "${#REQUEST_ARGS[@]}" -gt 0 ]]; then
+    comai_error 'usage: comai chat [--provider NAME] [--model MODEL] [--max-tokens N] [-f FILE]'
+    return 1
+  fi
+  chat_files=("${FILES[@]}")
+  for line in "${chat_files[@]}"; do request_options+=(-f "$line"); done
+  [[ -t 0 && -t 1 ]] && interactive=1
+
+  if [[ "$interactive" -eq 1 ]]; then
+    comai_color '1;36' 'ComAI Chat'
+    printf '\n'
+    comai_chat_status 0 "$max_context"
+    printf 'Type /help for commands, /clear to reset, /exit to quit.\n\n'
+  fi
   while true; do
-    printf '> '
-    IFS= read -r line || break
+    if [[ "$interactive" -eq 1 ]]; then
+      IFS= read -e -r -p 'You > ' line || break
+    else
+      IFS= read -r line || [[ -n "$line" ]] || break
+    fi
     case "$line" in
       /exit | /quit) break ;;
+      /help) comai_chat_help; continue ;;
+      /status) comai_chat_status "${#chat_context}" "$max_context"; continue ;;
+      /clear)
+        turns=(); chat_context=""; COMAI_LAST_RESPONSE=""
+        printf 'Conversation cleared.\n'
+        continue
+        ;;
+      //*) line="${line:1}" ;;
+      /*) comai_error 'unknown chat command; use /help or // to send a literal slash.'; continue ;;
       "") continue ;;
     esac
     if [[ -n "$chat_context" ]]; then
-      chat_prompt="$(cat << EOF
-Conversation so far:
+      chat_prompt="Conversation so far:
 ${chat_context}
 
 Latest user message:
 ${line}
 
-Answer the latest user message using the conversation context when helpful.
-EOF
-)"
+Answer the latest user message using the conversation context when helpful."
     else
       chat_prompt="$line"
     fi
-
-    comai_run_request "$chat_prompt" || return 1
-    chat_context="${chat_context}"$'\n'"User: ${line}"$'\n'"Assistant: ${COMAI_LAST_RESPONSE:-}"
-    if [[ "${#chat_context}" -gt "$max_context" ]]; then
-      chat_context="${chat_context: -$max_context}"
+    if [[ "$interactive" -eq 1 ]]; then
+      comai_color '1;36' 'ComAI >'
+      printf '\n'
     fi
+    # A typed message is data, never provider selection or a CLI option.
+    if comai_run_request "${request_options[@]}" -- "$chat_prompt"; then
+      chat_status=0
+    else
+      chat_status=$?
+      comai_error 'Message failed; conversation kept. Try again or use /exit.'
+      continue
+    fi
+    [[ "$interactive" -eq 0 ]] || printf '\n'
+    turns+=("User: ${line}"$'\n'"Assistant: ${COMAI_LAST_RESPONSE:-}"$'\n')
+    chat_context=""
+    for turn in "${turns[@]}"; do chat_context+="$turn"; done
+    # Drop complete turns instead of slicing through code or role labels.
+    while [[ "${#chat_context}" -gt "$max_context" && "${#turns[@]}" -gt 0 ]]; do
+      turns=("${turns[@]:1}")
+      chat_context=""
+      for turn in "${turns[@]}"; do chat_context+="$turn"; done
+    done
   done
+  return "$chat_status"
 }
 
 comai_cmd_version() {

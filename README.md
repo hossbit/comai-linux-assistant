@@ -139,6 +139,40 @@ comai --max-tokens 900 "summarize this"
 
 `--max-tokens` must be a positive integer.
 
+## Interactive Chat
+
+```bash
+comai chat
+comai chat --provider ollama --model qwen2.5-coder:7b
+comai chat --provider local -f application.log
+```
+
+The chat header shows your provider and model. On a terminal, the editable
+`You >` prompt supports cursor movement and separates your input from
+`ComAI >` replies. Commands available during a conversation:
+
+| Command | Action |
+| --- | --- |
+| `/help` | Show chat controls. |
+| `/status` | Show provider, model, and retained context size. |
+| `/clear` | Reset conversation context without deleting saved history. |
+| `/exit`, `/quit`, Ctrl-D | Leave chat. |
+| `//text` | Send a literal message beginning with `/`. |
+
+Provider errors leave the session open so you can retry. Failed turns are
+not added to context. Startup options such as `--provider`, `--model`,
+`--max-tokens`, and `-f` apply to the session; typed messages are treated as
+text, including messages starting with provider names or CLI flags.
+
+Responses preserve code indentation, repeated lines, Unicode, and relative
+paths. When conversation history exceeds `COMAI_CHAT_CONTEXT_MAX` (12000
+characters by default), the oldest complete turns are removed. A single
+turn larger than the limit is not retained for the next request. This limit
+covers retained conversation text, not the current message or file context.
+
+Piped chat omits the banner and input prompts. `NO_COLOR=1` disables colors,
+even when `COMAI_COLOR=1` is set.
+
 ## Providers
 
 ComAI supports:

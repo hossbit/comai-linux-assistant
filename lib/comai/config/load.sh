@@ -206,7 +206,7 @@ comai_usage() {
 Usage:
   comai setup       Configure provider, API, and model
   comai ask         Ask one question
-  comai chat        Start an interactive conversation
+  comai chat        Interactive chat: /help, /status, /clear, /exit
   comai explain     Explain a command, error, or output
   comai analyze     Analyze logs, files, or piped output
   comai status      Show provider status and connections
