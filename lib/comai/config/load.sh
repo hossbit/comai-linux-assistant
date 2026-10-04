@@ -7,7 +7,7 @@ comai_load_config() {
   local provider_gemini_api_base provider_gemini_model provider_gemini_api_key provider_gemini_api_key_cmd
   local provider_openrouter_api_base provider_openrouter_model provider_openrouter_api_key provider_openrouter_api_key_cmd
   local provider_ollama_api_base provider_ollama_model provider_lmstudio_api_base provider_lmstudio_model
-  local max_tokens timeout log_file file_max_bytes dir_context_max error_regex error_intent_regex
+  local input_max_bytes max_tokens timeout log_file file_max_bytes dir_context_max error_regex error_intent_regex
   local config_key config_value
 
   COMAI_CONFIG_FILE="$config_file"
@@ -43,6 +43,7 @@ comai_load_config() {
       max_tokens) max_tokens="$config_value" ;;
       timeout) timeout="$config_value" ;;
       log_file) log_file="$config_value" ;;
+      input_max_bytes) input_max_bytes="$config_value" ;;
       file_max_bytes) file_max_bytes="$config_value" ;;
       dir_context_max) dir_context_max="$config_value" ;;
       error_regex) error_regex="$config_value" ;;
@@ -195,6 +196,8 @@ comai_load_config() {
     log_file="$COMAI_ROOT_DIR/$log_file"
   fi
   COMAI_LOG_FILE="${COMAI_LOG_FILE:-$log_file}"
+  COMAI_INPUT_MAX_BYTES="${COMAI_INPUT_MAX_BYTES:-${input_max_bytes:-96000}}"
+  [[ "$COMAI_INPUT_MAX_BYTES" =~ ^[1-9][0-9]{0,6}$ ]] || { comai_error "input_max_bytes must be 1..9999999"; return 1; }
   COMAI_FILE_MAX_BYTES="${COMAI_FILE_MAX_BYTES:-${file_max_bytes:-24000}}"
   COMAI_DIR_CONTEXT_MAX="${COMAI_DIR_CONTEXT_MAX:-${dir_context_max:-120}}"
   COMAI_ERROR_RE="${COMAI_ERROR_RE:-${error_regex:-error|errors|failed|failure|exception|fatal|panic|timeout|warn|warning|traceback}}"
@@ -213,6 +216,7 @@ Usage:
   comai provider    Show active and available providers
   comai models      List models from all providers
   comai config      View, get, or edit settings
+  comai doctor      Diagnose the active provider and enabled plugins (--json)
   comai context     Preview local context without calling a model
   comai history     Show previous conversations
   comai start       Start the optional LocalAI helper service
@@ -253,6 +257,7 @@ Options:
   --model MODEL, --model=MODEL   Use a different model for this request
   --api-base URL, --api-base=URL Use a different provider API base
   --max-tokens N                Limit answer length; N must be a positive integer
+  --tail-context               Read the last bytes of each file (logs)
   -f, --file PATH               Add a readable file as context
   --                            Treat the remaining words as the request, not options/providers
   --local                       Accepted for old commands; the request still goes to AI
@@ -292,6 +297,7 @@ Environment:
   COMAI_LMSTUDIO_API_BASE=$COMAI_LMSTUDIO_API_BASE
   COMAI_MAX_TOKENS=$COMAI_MAX_TOKENS
   COMAI_LOG_FILE=$COMAI_LOG_FILE
+  COMAI_INPUT_MAX_BYTES=$COMAI_INPUT_MAX_BYTES
   COMAI_FILE_MAX_BYTES=$COMAI_FILE_MAX_BYTES
   COMAI_DIR_CONTEXT_MAX=$COMAI_DIR_CONTEXT_MAX
 EOF

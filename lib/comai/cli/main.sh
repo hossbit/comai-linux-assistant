@@ -144,7 +144,7 @@ comai_parse_global_prefix() {
 comai_main() {
   local command stdin_text stdin_file status
 
-  comai_load_config
+  comai_load_config || return 1
 
   comai_parse_global_prefix "$@" || return 1
   set -- "${COMAI_MAIN_ARGS[@]}"
@@ -160,6 +160,9 @@ comai_main() {
   case "$command" in
     setup)
       comai_cmd_setup "$@"
+      ;;
+    doctor)
+      comai_cmd_doctor "$@"
       ;;
     context)
       comai_cmd_context "$@"

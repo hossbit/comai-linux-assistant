@@ -1,6 +1,6 @@
 # ComAI - Linux Terminal AI Assistant
 
-Current version: **2.9.0**
+Current version: **2.10.0**
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-hero.webp" alt="ComAI local AI assistant for Linux" width="900">
@@ -360,3 +360,52 @@ comai context "what files are here?"
 ```
 
 This command displays the selected provider/model and the same file excerpts and directory context that a normal request would assemble. It does not call a model, send data, or save a conversation. Knowledge-plugin context is not included in this file/directory preview.
+
+## Health, bounded context and safe updates
+
+```bash
+comai doctor --json
+comai context --tail-context -f /path/to/service.log
+comai update --check
+comai update --ref v2.10.0
+comai update --rollback
+```
+
+`doctor` checks the active endpoint, authentication and configured model using a
+read-only model listing. JSON has `schema_version: 1`, `ok`, `provider`, `status`
+and `plugins`; exit 0 means healthy, exit 1 means a diagnosed failure. Statuses
+distinguish missing credentials, bad credentials, missing model, timeout,
+unreachable endpoint, unavailable server, rate limits and malformed responses.
+Response bodies, keys and endpoint URLs are excluded from diagnostics. ComAIX
+also checks enabled plugin manifests, entrypoints and required Python presence
+without executing plugin code.
+
+Set `input_max_bytes` in the YAML config or `COMAI_INPUT_MAX_BYTES` in the
+environment (default 96,000 bytes). It bounds the complete user payload sent to
+the provider, including prompt instructions, files, directory listing and
+knowledge. Files share the remaining budget; stderr identifies each omitted or
+truncated file. `file_max_bytes` still caps a single file. Oversized user requests
+are rejected before transmission. Piped text is read with a bounded buffer;
+use `tail -c 24000 service.log | comai analyze` for recent piped logs, or
+`--tail-context -f service.log` for recent file excerpts. Directory listings
+receive at most a quarter of the aggregate budget. Provider system instructions
+and output tokens are separate from this input byte budget.
+
+`update` defaults to the newest stable release tag and resolves it to a full
+commit before fetching or executing its installer. `--check` displays the target
+without applying it; `--ref` accepts a release tag or full 40-character commit.
+Git checkouts require a clean working tree and a fast-forward. Installed copies
+keep a private adjacent rollback snapshot; Git checkouts retain the prior commit.
+`--rollback` restores that application snapshot while preserving current config;
+Git rollback checks out the recorded commit in detached mode. External model and
+plugin user-data directories are unaffected. Snapshots remain available for
+manual inspection and cleanup.
+
+Without Git, updates require both an explicit full commit and a trusted
+`COMAI_TARBALL_SHA256` before downloading. Missing or mismatched checksums stop
+installation; archive traversal, links and special files are rejected. Obtain the
+checksum from a trusted release channel, not from the downloaded archive itself.
+
+Developers can run `bash scripts/test-parity.sh OTHER_REPOSITORY` to execute the
+same privacy/provider/input/update fixtures against both editions and detect
+fixture drift. Each repository also runs these fixtures in its core CI suite.

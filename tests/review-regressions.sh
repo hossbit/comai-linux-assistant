@@ -46,11 +46,11 @@ COMAI_TARBALL_SHA256=''
 comai_have() { [[ "$1" == git ]]; }
 git() { return 37; }
 update_status=0
-comai_cmd_update > /dev/null 2>&1 || update_status=$?
+comai_cmd_update --check > /dev/null 2>&1 || update_status=$?
 [[ "$update_status" == 37 ]]
 mkdir "$test_update_dir/.git"
 update_status=0
-comai_cmd_update > /dev/null 2>&1 || update_status=$?
+comai_cmd_update --check > /dev/null 2>&1 || update_status=$?
 [[ "$update_status" == 37 ]]
 
 printf 'preview fixture 9876\n' > "$test_update_dir/preview.txt"

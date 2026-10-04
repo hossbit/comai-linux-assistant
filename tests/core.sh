@@ -176,3 +176,7 @@ main() {
 }
 
 main "$@"
+
+bash "$ROOT_DIR/tests/shared-contracts.sh" "$ROOT_DIR"
+
+bash "$ROOT_DIR/tests/update-provenance.sh" "$ROOT_DIR"

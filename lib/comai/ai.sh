@@ -39,5 +39,10 @@ comai_clean_ai_output() {
 }
 
 comai_ask_ai() {
+  local prompt="$1" limit="${COMAI_INPUT_MAX_BYTES:-96000}"
+  if [[ "$(LC_ALL=C printf '%s' "$prompt" | wc -c)" -gt "$limit" ]]; then
+    comai_error "request exceeds input_max_bytes ($limit); reduce the request or attached context"
+    return 1
+  fi
   comai_provider_ask "$@"
 }

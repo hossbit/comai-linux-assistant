@@ -181,6 +181,9 @@ main() {
       "$ROOT_DIR/lib/comai/ai.sh" \
       "$ROOT_DIR/tests/core.sh" \
       "$ROOT_DIR/tests/review-regressions.sh" \
+      "$ROOT_DIR/tests/shared-contracts.sh" \
+      "$ROOT_DIR/tests/update-provenance.sh" \
+      "$ROOT_DIR/scripts/test-parity.sh" \
       "$ROOT_DIR/scripts/uninstall.sh"
   else
     printf 'shellcheck: skipped (not installed)\n'

@@ -76,3 +76,6 @@ error_regex: error|errors|failed|failure|exception|fatal|panic|timeout|warn|warn
 
 # Regex used to decide whether a file question is asking for a log/error check.
 error_intent_regex: error|errors|failed|failure|warning|warnings|problem|problems|issue|issues|wrong|bad|broken|fail|crash|crashed|panic|timeout|traceback|healthy|health|(^|[[:space:]])ok([[:space:]]|$)|okay|check (this )?log|scan (this )?log
+
+# Aggregate user payload budget in bytes, across files, directory and piped input.
+input_max_bytes: 96000

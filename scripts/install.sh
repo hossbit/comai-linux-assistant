@@ -812,10 +812,7 @@ detect_install_metadata() {
   COMAI_VERSION="$(sed -n 's/^COMAI_VERSION="\([^"]*\)"/\1/p' "$ROOT_DIR/bin/comai" | head -n 1)"
   if command -v git > /dev/null 2>&1 && [[ -d "$ROOT_DIR/.git" ]]; then
     INSTALL_SOURCE_URL="$(git -C "$ROOT_DIR" remote get-url origin 2> /dev/null || printf '%s' "$INSTALL_SOURCE_URL")"
-    git_ref="$(git -C "$ROOT_DIR" symbolic-ref --quiet --short HEAD 2> /dev/null || true)"
-    if [[ -z "$git_ref" ]]; then
-      git_ref="$(git -C "$ROOT_DIR" describe --tags --exact-match 2> /dev/null || true)"
-    fi
+    git_ref="$(git -C "$ROOT_DIR" rev-parse HEAD 2> /dev/null || true)"
     if [[ -n "$git_ref" ]]; then
       INSTALL_SOURCE_REF="$git_ref"
     fi

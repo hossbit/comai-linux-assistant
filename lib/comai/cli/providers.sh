@@ -227,3 +227,84 @@ comai_cmd_provider() {
       ;;
   esac
 }
+
+# shellcheck shell=bash disable=SC2154
+
+# Only status codes and dependency names leave this diagnostic; never response bodies or URLs.
+comai_cmd_doctor() {
+  local format=human provider="${COMAI_PROVIDER}" model base_url route tmp http rc=0 state=ok plugins='[]' name result
+  case "${1:-}" in --json) format=json; shift ;; esac
+  [[ $# -eq 0 ]] || { comai_error 'usage: doctor [--json]'; return 2; }
+  if ! comai_have jq; then
+    [[ "$format" == json ]] && printf '{"schema_version":1,"ok":false,"status":"missing_dependency","dependency":"jq"}\n'
+    comai_error 'doctor requires jq'; return 1
+  fi
+  if ! comai_have curl; then
+    state=missing_dependency
+  else
+    model="$COMAI_MODEL"
+    base_url="${COMAI_API_BASE%/}"
+    if [[ ! "$base_url" =~ ^https?://[^/?#@]+(/[^?#]*)?$ ]]; then
+      state=invalid_endpoint
+    else
+      route='/v1/models'
+      [[ "$provider" == ollama ]] && route='/api/tags'
+      [[ "$provider" == gemini ]] && route='/v1beta/models'
+      tmp="$(mktemp)" || return 1
+      chmod 600 "$tmp"
+      comai_provider_allow_key_cmd "$provider"
+      case "$provider" in
+        openai|gemini|openrouter)
+          if ! "comai_${provider}_ensure_api_key" 2>/dev/null; then
+            name="COMAI_${provider^^}_API_KEY_STATUS"
+            case "${!name:-missing}" in
+              missing) state=missing_credentials ;;
+              untrusted_config) state=untrusted_key_command ;;
+              *) state=key_command_failed ;;
+            esac
+          fi ;;
+      esac
+      if [[ "$state" == ok ]]; then
+        local -a transport=(curl)
+        case "$provider" in
+          openai|openrouter)
+            name="COMAI_${provider^^}_API_KEY"
+            transport=("comai_${provider}_curl_auth" "${!name}") ;;
+          gemini) transport=(comai_gemini_curl_key "$COMAI_GEMINI_API_KEY") ;;
+        esac
+        http="$("${transport[@]}" --connect-timeout 3 --max-time 8 --max-filesize 1048576 -sS -o "$tmp" -w '%{http_code}' "$base_url$route" 2>/dev/null)" || rc=$?
+        if [[ "$rc" -eq 28 ]]; then state=timeout
+        elif [[ "$rc" -ne 0 ]]; then state=unreachable
+        else
+          case "$http" in
+            401|403) state=bad_credentials ;;
+            429) state=rate_limited ;;
+            5??) state=server_unavailable ;;
+            2??)
+              local expression='.data | type == "array" and all(.[]; (.id | type == "string"))'
+              [[ "$provider" == ollama ]] && expression='.models | type == "array" and all(.[]; (.name | type == "string"))'
+              [[ "$provider" == gemini ]] && expression='.models | type == "array" and all(.[]; (.name | type == "string"))'
+              if ! jq -e "$expression" "$tmp" >/dev/null 2>&1; then state=invalid_response
+              elif ! jq -e --arg model "$model" 'any((.data // .models)[]; (.id // .name | sub("^models/"; "")) == ($model | sub("^models/"; "")))' "$tmp" >/dev/null 2>&1; then state=missing_model
+              fi ;;
+            *) state=endpoint_error ;;
+          esac
+        fi
+      fi
+      rm -f "$tmp"
+    fi
+  fi
+  # Existing plugin doctor validates manifests, entrypoints, runtime and command conflicts without executing plugins.
+  if declare -F comai_plugin_enabled_dir >/dev/null; then
+    for result in "$(comai_plugin_enabled_dir)"/*; do
+      [[ -f "$result" ]] || continue
+      name="${result##*/}"
+      if comai_cmd_plugin_doctor "$name" >/dev/null 2>&1; then result=ok; else result=dependency_error; fi
+      plugins="$(jq -c --arg name "$name" --arg status "$result" '. + [{name:$name,status:$status}]' <<< "$plugins")"
+    done
+  fi
+  result="$(jq -n --arg provider "$provider" --arg status "$state" --argjson plugins "$plugins" '{schema_version:1,ok:($status == "ok" and all($plugins[]; .status == "ok")),provider:$provider,status:$status,plugins:$plugins}')"
+  if [[ "$format" == json ]]; then printf '%s\n' "$result"
+  else jq -r '"Provider: \(.provider)\nHealth: \(.status)", (.plugins[] | "Plugin \(.name): \(.status)")' <<< "$result"; fi
+  jq -e '.ok' <<< "$result" >/dev/null
+}

@@ -33,7 +33,13 @@ comai_history_add() {
 
 comai_read_stdin_if_piped() {
   if [[ ! -t 0 ]]; then
-    cat
+    local limit="${COMAI_INPUT_MAX_BYTES:-96000}" excerpt
+    excerpt="$(head -c "$((limit + 1))"; printf '.')"
+    excerpt="${excerpt%.}"
+    if [[ "$(LC_ALL=C printf '%s' "$excerpt" | wc -c)" -gt "$limit" ]]; then
+      comai_error "stdin: omitted bytes after $limit (input budget); use tail -c before piping for recent logs"
+      printf '%s' "$excerpt" | head -c "$limit"
+    else printf '%s' "$excerpt"; fi
   fi
 }
 
@@ -258,6 +264,7 @@ comai_run_request() {
   fi
 
   comai_confirm_cloud_file_context "$dir_context" || return 1
+  COMAI_CONTEXT_REMAINING=$((COMAI_INPUT_MAX_BYTES - $(LC_ALL=C printf '%s%s' "$text" "$dir_context" | wc -c) - 2048))
   files="$(comai_file_context)"
   prompt="$(comai_ai_prompt "$text" "$dir_context" "$files")"
   if ! comai_run_with_spinner_capture response "ComAI Thinking ( ${COMAI_PROVIDER} )" comai_ask_ai "$prompt"; then
@@ -375,9 +382,10 @@ comai_cmd_context() {
   comai_parse_args "$@" || return 1
   comai_detect_mentioned_files
   text="$(comai_join_args "${REQUEST_ARGS[@]}")"
-  if comai_wants_directory_context "$text"; then
+  if comai_wants_directory_context "$text" "${text,,}"; then
     dir_context="$(comai_directory_context)"
   fi
+  COMAI_CONTEXT_REMAINING=$((COMAI_INPUT_MAX_BYTES - $(LC_ALL=C printf '%s%s' "$text" "$dir_context" | wc -c) - 2048))
   files="$(comai_file_context)"
   {
     printf 'Context preview only: no provider request.\n'

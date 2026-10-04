@@ -89,7 +89,7 @@ comai_wants_directory_context() {
   esac
 }
 
-comai_directory_context() {
+comai_directory_context_raw() {
   local limit="$COMAI_DIR_CONTEXT_MAX"
 
   printf 'Current directory context:\n'
@@ -107,46 +107,37 @@ comai_directory_context() {
 }
 
 comai_file_context() {
-  local file size shown mime
-
   [[ "${#FILES[@]}" -gt 0 ]] || return 0
-
-  printf 'File context:\n'
+  local file size shown mime header excerpt remaining="${COMAI_CONTEXT_REMAINING:-${COMAI_INPUT_MAX_BYTES:-96000}}" bytes
   for file in "${FILES[@]}"; do
-    if [[ ! -f "$file" ]]; then
-      printf '\n--- %s ---\n[File not found]\n' "$file"
-      continue
-    fi
-
-    if [[ ! -r "$file" ]]; then
-      printf '\n--- %s ---\n[File is not readable]\n' "$file"
-      continue
-    fi
-
-    size="$(wc -c < "$file" | tr -d '[:space:]')"
-    shown="$size"
-    if [[ "$size" -gt "$COMAI_FILE_MAX_BYTES" ]]; then
-      shown="$COMAI_FILE_MAX_BYTES"
-    fi
-
-    mime=""
-    if comai_have file; then
-      mime="$(file -b --mime-type "$file" 2> /dev/null || true)"
-    fi
-
-    printf '\n--- %s (%s bytes' "$file" "$size"
-    [[ -n "$mime" ]] && printf ', %s' "$mime"
-    printf ') ---\n'
-
-    if [[ -n "$mime" && "$mime" != text/* && "$mime" != application/json && "$mime" != application/xml && "$mime" != application/x-sh ]]; then
-      printf '[Binary or non-text file; content not included]\n'
-      continue
-    fi
-
-    head -c "$shown" "$file" 2> /dev/null || true
-    if [[ "$size" -gt "$COMAI_FILE_MAX_BYTES" ]]; then
-      printf '\n[Truncated after %s bytes]\n' "$COMAI_FILE_MAX_BYTES"
-    fi
-    printf '\n'
+    [[ -f "$file" && -r "$file" ]] || { comai_error "context omitted: unreadable file $file"; continue; }
+    size="$(stat -c '%s' -- "$file")" || continue
+    mime='unknown'
+    comai_have file && mime="$(file --mime-type -b -- "$file")"
+    case "$mime" in text/*|application/json|application/xml|application/x-sh|unknown) ;;
+      *) comai_error "context omitted: binary file $file"; continue ;; esac
+    header="$(printf '\nFile: %s (%s bytes, %s)\n' "$file" "$size" "$mime")"$'\n'
+    bytes="$(LC_ALL=C printf '%s' "$header" | wc -c)"
+    shown=$((remaining - bytes - 1))
+    (( shown > 0 )) || { comai_error "context omitted: $file (aggregate input budget)"; continue; }
+    (( shown <= COMAI_FILE_MAX_BYTES )) || shown="$COMAI_FILE_MAX_BYTES"
+    (( shown <= size )) || shown="$size"
+    if [[ "${COMAI_CONTEXT_TAIL:-0}" == 1 ]]; then excerpt="$(tail -c "$shown" -- "$file")"
+    else excerpt="$(head -c "$shown" -- "$file")"; fi
+    printf '%s%s\n' "$header" "$excerpt"
+    bytes="$(LC_ALL=C printf '%s%s\n' "$header" "$excerpt" | wc -c)"
+    remaining=$((remaining - bytes))
+    (( shown >= size )) || comai_error "context truncated: $file ($shown of $size bytes; tail=${COMAI_CONTEXT_TAIL:-0})"
   done
+}
+
+comai_directory_context() {
+  local limit=$(( ${COMAI_INPUT_MAX_BYTES:-96000} / 4 )) excerpt bytes
+  excerpt="$(comai_directory_context_raw | head -c "$((limit + 1))" || true; printf '.')"
+  excerpt="${excerpt%.}"
+  bytes="$(LC_ALL=C printf '%s' "$excerpt" | wc -c)"
+  if (( bytes > limit )); then
+    comai_error "directory context: omitted listing bytes after $limit (aggregate budget)"
+    printf '%s' "$excerpt" | head -c "$limit"
+  else printf '%s' "$excerpt"; fi
 }

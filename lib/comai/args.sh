@@ -14,6 +14,7 @@ comai_parse_args() {
 
   REQUEST_ARGS=()
   FILES=()
+  COMAI_CONTEXT_TAIL=0
 
   while [[ "$#" -gt 0 ]]; do
     arg="$1"
@@ -154,6 +155,9 @@ comai_parse_args() {
         ;;
       --)
         literal_args=1
+        ;;
+      --tail-context)
+        COMAI_CONTEXT_TAIL=1
         ;;
       --file=* | --files=* | -f=*)
         FILES+=("${arg#*=}")
