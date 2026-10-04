@@ -21,9 +21,9 @@
 
 <div align="center">
 
-<a href="https://github.com/hossbit/comai-linux-assistant/releases/latest"><img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-badge-release.svg" alt="Latest Release" height="68"></a>
-<a href="https://github.com/hossbit/comai-linux-assistant/pulse"><img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-badge-download.svg" alt="Downloads" height="68"></a>
-<a href="https://github.com/hossbit/comai-linux-assistant/stargazers"><img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-badge-stars.svg" alt="GitHub Stars" height="68"></a>
+<a href="https://github.com/hossbit/comai-linux-assistant/releases/latest"><img src="https://img.shields.io/github/v/release/hossbit/comai-linux-assistant?style=for-the-badge&label=Release&color=6857df&cacheSeconds=300" alt="Latest Release" height="68"></a>
+<a href="https://github.com/hossbit/comai-linux-assistant/releases"><img src="https://img.shields.io/github/downloads/hossbit/comai-linux-assistant/total?style=for-the-badge&label=Downloads&color=15b887&cacheSeconds=300" alt="Downloads" height="68"></a>
+<a href="https://github.com/hossbit/comai-linux-assistant/stargazers"><img src="https://img.shields.io/github/stars/hossbit/comai-linux-assistant?style=for-the-badge&label=Stars&color=f0a020&cacheSeconds=300" alt="GitHub Stars" height="68"></a>
 </div>
 
 **ComAI** is a Bash-powered AI assistant for your Linux terminal.
