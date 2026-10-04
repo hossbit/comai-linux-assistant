@@ -1,2 +1,7 @@
 config/comai.yaml.backup.*
 logs/
+
+# Validation stays on the maintainer workstation.
+/tests/
+/scripts/test-local.sh
+/scripts/test-parity.sh

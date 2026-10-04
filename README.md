@@ -302,6 +302,8 @@ Full documentation lives in the wiki:
 - [ComAI + LocalAI](https://github.com/hossbit/comai-linux-assistant-wiki/blob/main/ComAI-and-LocalAI.md)
 - [Local AI Service](https://github.com/hossbit/comai-linux-assistant-wiki/blob/main/Local-AI-Service.md)
 - [File and Log Analysis](https://github.com/hossbit/comai-linux-assistant-wiki/blob/main/File-and-Log-Analysis.md)
+- [Health and diagnostics](https://github.com/hossbit/comai-linux-assistant-wiki/blob/main/Health-and-Diagnostics.md)
+- [Updates and rollback](https://github.com/hossbit/comai-linux-assistant-wiki/blob/main/Updates-and-Rollback.md)
 - [Troubleshooting](https://github.com/hossbit/comai-linux-assistant-wiki/blob/main/Troubleshooting.md)
 - [Uninstall](https://github.com/hossbit/comai-linux-assistant-wiki/blob/main/Uninstall.md)
 
@@ -325,15 +327,9 @@ expected to work there. Minimal BusyBox/toybox-based containers, Alpine images,
 and some UBI-minimal images may not provide those GNU extensions; install GNU
 findutils/coreutils or run ComAI from a fuller Debian/RHEL userland.
 
-For local portability checks, run:
-
-```bash
-scripts/test-local.sh
-```
-
-The test script uses the current `awk`, plus `mawk` and `gawk` when installed.
-To fully exercise the RHEL/Fedora awk path, run it on a host with `gawk`
-installed.
+Maintainer validation runs locally. Test suites and test runners are excluded
+from this repository and release sources. A fresh clone contains the application
+and documentation, without tests or automated GitHub test workflows.
 
 ## Support
 
@@ -408,4 +404,4 @@ checksum from a trusted release channel, not from the downloaded archive itself.
 
 Developers can run `bash scripts/test-parity.sh OTHER_REPOSITORY` to execute the
 same privacy/provider/input/update fixtures against both editions and detect
-fixture drift. Each repository also runs these fixtures in its core CI suite.
+fixture drift. Test suites and test runners are maintained locally, excluded from Git and release sources. No GitHub Actions test workflow is published.
