@@ -1,7 +1,5 @@
 # ComAI - Linux Terminal AI Assistant
 
-Current version: **2.10.0**
-
 <div align="center">
   <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-hero.webp" alt="ComAI local AI assistant for Linux" width="900">
 </div>
