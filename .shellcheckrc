@@ -1,0 +1,5 @@
+shell=bash
+# Dynamic module paths and shared globals are resolved by the launcher.
+disable=SC1091,SC2034
+# Human examples intentionally contain literal backticks and ~/ prefixes.
+disable=SC2016,SC2088

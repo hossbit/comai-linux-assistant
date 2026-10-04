@@ -116,7 +116,7 @@ comai_answer_file_contains() {
 
   for file in "${FILES[@]}"; do
     [[ -f "$file" && -r "$file" ]] || continue
-    count="$(grep -F -- "$needle" "$file" 2> /dev/null | wc -l | tr -d '[:space:]')"
+    count="$(grep -Fc -- "$needle" "$file" 2> /dev/null || true)"
     if [[ "$count" -gt 0 ]]; then
       printf 'Yes. `%s` appears in %s on %s line(s).\n' "$needle" "$file" "$count"
       grep -nF -- "$needle" "$file" 2> /dev/null | head -5 | comai_strip_terminal_controls

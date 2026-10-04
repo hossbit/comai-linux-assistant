@@ -118,14 +118,10 @@ comai_expand_config_path() {
 }
 
 comai_api_base_is_loopback_http() {
-  case "$1" in
-    http://127.* | http://localhost | http://localhost:* | http://0.0.0.0 | http://0.0.0.0:* | http://[::1] | http://[::1]:*)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
+  local authority="${1#http://}"
+  [[ "$1" == http://* ]] || return 1
+  authority="${authority%%/*}"
+  [[ "$authority" =~ ^(localhost|127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|0\.0\.0\.0|\[::1\])(:[0-9]+)?$ ]]
 }
 
 comai_warn_insecure_api_base() {

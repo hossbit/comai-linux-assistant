@@ -23,7 +23,7 @@ comai_cmd_update() {
 
   if [[ -d "$COMAI_ROOT_DIR/.git" ]]; then
     printf 'Updating git checkout: %s\n' "$COMAI_ROOT_DIR"
-    git -C "$COMAI_ROOT_DIR" pull --ff-only
+    git -C "$COMAI_ROOT_DIR" pull --ff-only || return "$?"
   else
     source_url="$COMAI_SOURCE_URL"
     source_ref="$COMAI_REF"
@@ -46,7 +46,9 @@ comai_cmd_update() {
     printf 'Creating a temporary source checkout from: %s (%s)\n' "$source_url" "$source_ref"
     printf 'Existing config values will be preserved by the installer.\n'
     if comai_have git; then
-      if ! git clone --depth 1 --branch "$source_ref" "$source_url" "$source_dir"; then
+      if git clone --depth 1 --branch "$source_ref" "$source_url" "$source_dir"; then
+        :
+      else
         status=$?
         rm -rf "$temp_dir"
         return "$status"
@@ -68,7 +70,9 @@ comai_cmd_update() {
           archive_file="$tarball_base/refs/heads/$source_ref.tar.gz"
           ;;
       esac
-      if ! curl -fsSL "$archive_file" -o "$temp_dir/comai.tar.gz"; then
+      if curl -fsSL "$archive_file" -o "$temp_dir/comai.tar.gz"; then
+        :
+      else
         status=$?
         rm -rf "$temp_dir"
         return "$status"
@@ -79,7 +83,9 @@ comai_cmd_update() {
           rm -rf "$temp_dir"
           return 1
         fi
-        if ! printf '%s  %s\n' "$tarball_sha256" "$temp_dir/comai.tar.gz" | sha256sum -c -; then
+        if printf '%s  %s\n' "$tarball_sha256" "$temp_dir/comai.tar.gz" | sha256sum -c -; then
+          :
+        else
           status=$?
           rm -rf "$temp_dir"
           return "$status"
@@ -87,7 +93,9 @@ comai_cmd_update() {
       else
         comai_error "No COMAI_TARBALL_SHA256 provided; tarball integrity was not verified."
       fi
-      if ! tar -xzf "$temp_dir/comai.tar.gz" -C "$temp_dir"; then
+      if tar -xzf "$temp_dir/comai.tar.gz" -C "$temp_dir"; then
+        :
+      else
         status=$?
         rm -rf "$temp_dir"
         return "$status"

@@ -1,5 +1,7 @@
 # ComAI - Linux Terminal AI Assistant
 
+Current version: **2.9.0**
+
 <div align="center">
   <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/comai-hero.webp" alt="ComAI local AI assistant for Linux" width="900">
 </div>
@@ -343,3 +345,18 @@ installed.
 <div align="center">
   <img src="https://raw.githubusercontent.com/hossbit/mirassets/main/images/give-it-a-star.webp" alt="If this repo helped you, give it a star" width="100%">
 </div>
+
+## Context and response integrity
+
+Responses preserve code indentation, relative paths, repeated text, and Unicode. Only terminal control bytes are removed. When a cloud provider receives local files or a directory listing, the existing confirmation policy applies to both; non-interactive use requires explicit opt-in via `COMAI_ASSUME_YES=1`. File and knowledge contents are evidence, not instructions to override your request.
+
+Updates preserve nonzero exit codes when fetching, cloning, checking integrity, or unpacking fails. Local HTTP detection validates the URL authority; domains such as `127.attacker.example` are not treated as loopback. Regression checks run without requiring your real local AI server to be stopped.
+
+### Preview context before sending
+
+```bash
+comai context "summarize this file" -f application.log
+comai context "what files are here?"
+```
+
+This command displays the selected provider/model and the same file excerpts and directory context that a normal request would assemble. It does not call a model, send data, or save a conversation. Knowledge-plugin context is not included in this file/directory preview.

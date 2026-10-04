@@ -161,6 +161,9 @@ comai_main() {
     setup)
       comai_cmd_setup "$@"
       ;;
+    context)
+      comai_cmd_context "$@"
+      ;;
     ask)
       comai_run_request "$@"
       ;;

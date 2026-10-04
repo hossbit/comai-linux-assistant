@@ -213,6 +213,7 @@ Usage:
   comai provider    Show active and available providers
   comai models      List models from all providers
   comai config      View, get, or edit settings
+  comai context     Preview local context without calling a model
   comai history     Show previous conversations
   comai start       Start the optional LocalAI helper service
   comai stop        Stop the optional LocalAI helper service

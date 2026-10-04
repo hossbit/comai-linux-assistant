@@ -40,10 +40,12 @@ comai_read_stdin_if_piped() {
 comai_confirm_cloud_file_context() {
   local answer
 
-  [[ "${#FILES[@]}" -gt 0 ]] || return 0
+  # FILES is the shared array populated by args.sh; files is an excerpt string.
+  # shellcheck disable=SC2153
+  [[ "${#FILES[@]}" -gt 0 || -n "${1:-}" ]] || return 0
   comai_provider_requires_key "$COMAI_PROVIDER" || return 0
 
-  comai_error "notice: ${#FILES[@]} file(s) will be sent to the ${COMAI_PROVIDER} cloud provider as prompt context."
+  comai_error "notice: local context (${#FILES[@]} file(s), plus any directory listing) will be sent to the ${COMAI_PROVIDER} cloud provider."
   if [[ "${COMAI_ASSUME_YES:-0}" == "1" || "${COMAI_CLOUD_FILE_CONFIRM:-1}" == "0" ]]; then
     return 0
   fi
@@ -250,13 +252,12 @@ comai_run_request() {
     esac
   fi
 
-  comai_confirm_cloud_file_context || return 1
-
   dir_context=""
   if comai_wants_directory_context "$text" "$text_lc"; then
     dir_context="$(comai_directory_context)"
   fi
 
+  comai_confirm_cloud_file_context "$dir_context" || return 1
   files="$(comai_file_context)"
   prompt="$(comai_ai_prompt "$text" "$dir_context" "$files")"
   if ! comai_run_with_spinner_capture response "ComAI Thinking ( ${COMAI_PROVIDER} )" comai_ask_ai "$prompt"; then
@@ -365,4 +366,26 @@ Answer the latest user message using the conversation context when helpful."
 
 comai_cmd_version() {
   printf 'ComAI %s\n' "$COMAI_VERSION"
+}
+
+# Preview exactly the local file/directory context; never call a provider.
+comai_cmd_context() {
+  local text dir_context="" files
+  COMAI_FILES_SEEN=()
+  comai_parse_args "$@" || return 1
+  comai_detect_mentioned_files
+  text="$(comai_join_args "${REQUEST_ARGS[@]}")"
+  if comai_wants_directory_context "$text"; then
+    dir_context="$(comai_directory_context)"
+  fi
+  files="$(comai_file_context)"
+  {
+    printf 'Context preview only: no provider request.\n'
+    printf 'Provider: %s\nModel: %s\n' "$COMAI_PROVIDER" "$COMAI_MODEL"
+    if [[ -z "$dir_context" && -z "$files" ]]; then
+      printf 'No local file or directory context selected. Use -f FILE or ask about files here.\n'
+    else
+      printf '%s\n%s\n' "$dir_context" "$files"
+    fi
+  } | comai_strip_terminal_controls
 }

@@ -87,7 +87,10 @@ run_with_awk() {
   output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" --max-tokens -5 hi 2>&1 || true)"
   assert_contains "$output" '--max-tokens must be a positive integer.'
 
-  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" -- ollama is first word 2>&1 || true)"
+  local dead_cfg="$tmp_dir/dead-local.yaml"
+  sed -E 's#api_base: http://127\.0\.0\.1:11435#api_base: http://127.0.0.1:9#' \
+    "$ROOT_DIR/config/comai.yaml" > "$dead_cfg"
+  output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 COMAI_CONFIG="$dead_cfg" "$ROOT_DIR/bin/comai" -- ollama is first word 2>&1 || true)"
   assert_contains "$output" 'Local provider API is not responding'
 
   output="$(PATH="$tmp_dir:$PATH" COMAI_LOG_ENABLED=0 "$ROOT_DIR/bin/comai" newest file)"
@@ -168,11 +171,16 @@ main() {
       "$ROOT_DIR/lib/comai/providers/lmstudio.sh" \
       "$ROOT_DIR/lib/comai/providers/openai.sh" \
       "$ROOT_DIR/lib/comai/providers/gemini.sh" \
+      "$ROOT_DIR/lib/comai/cli/main.sh" \
+      "$ROOT_DIR/lib/comai/cli/runtime.sh" \
+      "$ROOT_DIR/lib/comai/cli/update.sh" \
+      "$ROOT_DIR/lib/comai/args.sh" \
       "$ROOT_DIR/lib/comai/config.sh" \
       "$ROOT_DIR/lib/comai/context.sh" \
       "$ROOT_DIR/lib/comai/local-checks.sh" \
       "$ROOT_DIR/lib/comai/ai.sh" \
       "$ROOT_DIR/tests/core.sh" \
+      "$ROOT_DIR/tests/review-regressions.sh" \
       "$ROOT_DIR/scripts/uninstall.sh"
   else
     printf 'shellcheck: skipped (not installed)\n'
